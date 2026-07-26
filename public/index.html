@@ -21,7 +21,7 @@ button{background:#26323d;color:#eee;border:1px solid #465361;border-radius:6px;
 .modal{position:fixed;inset:0;background:#000b;display:none;align-items:center;justify-content:center;z-index:50}.modal.show{display:flex}.modalbox{background:#1b222a;border:1px solid #465361;border-radius:12px;padding:20px;width:min(900px,94vw);max-height:90vh;overflow:auto}.modalbox.small{width:min(440px,94vw)}
 .form{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.form label{display:flex;flex-direction:column;gap:4px;color:#cbd5e1}.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:10px 0}.stat{background:#111;border:1px solid #39434d;border-radius:7px;padding:8px}.stat input{width:100%;background:#1b222a;color:#fff;border:1px solid #465361;padding:6px}
 .section{border-top:1px solid #39434d;padding-top:10px;margin-top:10px}
-.weapon-row{display:grid;grid-template-columns:1.3fr 0.7fr 1.2fr 0.8fr 35px;gap:5px;align-items:center;margin-bottom:5px}
+.weapon-row{display:grid;grid-template-columns:1.2fr 0.6fr 0.7fr 0.6fr 1fr 35px;gap:5px;align-items:center;margin-bottom:5px}
 .armor-row{display:grid;grid-template-columns:1.4fr .7fr .8fr .8fr 70px;gap:5px;align-items:center;margin-bottom:5px}
 .inventory{display:grid;grid-template-columns:1fr 80px 100px 35px;gap:5px;align-items:center;margin-bottom:5px}
 .weapon-row input,.armor-row input,.inventory input{background:#111;color:#fff;border:1px solid #39434d;padding:6px;min-width:0}
@@ -86,7 +86,7 @@ button{background:#26323d;color:#eee;border:1px solid #465361;border-radius:6px;
 </div>
 <h3>CHAT</h3><div class="chat" id="chat"></div><div class="chatbox"><input id="msg" placeholder="Scrivi..."><button id="send">➤</button></div>
 </aside>
-<div class="bottom"><button id="addHero">+ Eroe</button><button id="addEnemy">+ Mostro</button><button id="addNpc">+ PNG</button><button id="addObj">+ Oggetto</button><button id="toggleMove">🚶 Movimento</button><button id="toggleDM">👑 Modalità DM</button><span>V4: combattimento, movimento touch/mouse e mappa orizzontale</span><div class="zoom">Zoom <input id="zoom" type="range" min="50" max="160" value="85"><b id="zoomVal">85%</b></div></div>
+<div class="bottom"><button id="addHero">+ Eroe</button><button id="addEnemy">+ Mostro</button><button id="addNpc">+ PNG</button><button id="addObj">+ Oggetto</button><button id="toggleMove">🚶 Movimento</button><button id="toggleDM">👑 Modalità DM</button><span>V5: Modificatori avanzati (Iniziativa, Danni)</span><div class="zoom">Zoom <input id="zoom" type="range" min="50" max="160" value="85"><b id="zoomVal">85%</b></div></div>
 </div>
 
 <div class="modal" id="sheetModal"><div class="modalbox">
@@ -94,7 +94,10 @@ button{background:#26323d;color:#eee;border:1px solid #465361;border-radius:6px;
 <div class="form">
 <label>Nome<input id="fName"></label><label>Classe<input id="fClass"></label><label>Livello<input id="fLevel" type="number" min="1"></label>
 <label>Razza/specie<input id="fRace"></label><label>Background<input id="fBackground"></label><label>CA<input id="fAC" type="number"></label>
-<label>PF attuali<input id="fHP" type="number"></label><label>PF massimi<input id="fMaxHP" type="number"></label><label>Velocità<input id="fSpeed" type="number"></label><label>Iniziativa<input id="fInit" type="number"></label>
+<label>PF attuali<input id="fHP" type="number"></label><label>PF massimi<input id="fMaxHP" type="number"></label><label>Velocità<input id="fSpeed" type="number"></label>
+<label>Mod. Iniziativa<input id="fInitMod" type="number" placeholder="es. +2"></label>
+<label>Lancio Iniziativa<input id="fInit" type="number" placeholder="Lancio D20"></label>
+<label>Bonus Competenza<input id="fProfBonus" type="number" placeholder="es. +2"></label>
 </div>
 <h3>Caratteristiche</h3><div class="stats" id="stats"></div>
 <div class="section"><h3>Abilità e tiri salvezza</h3><div id="skills"></div></div>
@@ -110,7 +113,7 @@ button{background:#26323d;color:#eee;border:1px solid #465361;border-radius:6px;
 <script>
 const abilities=["Forza","Destrezza","Costituzione","Intelligenza","Saggezza","Carisma"];
 const skillList=["Acrobazia","Addestrare Animali","Arcano","Atletica","Furtività","Indagare","Inganno","Intimidire","Intuizione","Medicina","Natura","Percezione","Persuasione","Rapidità di Mano","Religione","Sopravvivenza","Storia","Intrattenere"];
-function defaultSheet(name,cls){return{name,class:cls||"Guerriero",level:1,race:"",background:"",ac:10,speed:9,movementUsed:0,stats:{Forza:10,Destrezza:10,Costituzione:10,Intelligenza:10,Saggezza:10,Carisma:10},proficiencies:[],saves:[],inventory:[],weapons:[],armor:{name:"",ac:0,equipped:false},shield:{name:"",bonus:0,equipped:false},conditions:[]}}
+function defaultSheet(name,cls){return{name,class:cls||"Guerriero",level:1,race:"",background:"",ac:10,speed:9,movementUsed:0,initMod:0,profBonus:2,stats:{Forza:10,Destrezza:10,Costituzione:10,Intelligenza:10,Saggezza:10,Carisma:10},proficiencies:[],saves:[],inventory:[],weapons:[],armor:{name:"",ac:0,equipped:false},shield:{name:"",bonus:0,equipped:false},conditions:[]}}
 function modifier(v){return Math.floor((Number(v)-10)/2)}
 
 let state={tokens:[
@@ -155,15 +158,19 @@ function selectToken(i){
  const t=state.tokens[i];
  if(!t)return;
  
- // QUI HO AGGIORNATO LA VISUALIZZAZIONE DELLE ARMI PER INCLUDERE IL TXC
  const weaponText=(t.sheet?.weapons||[]).filter(w=>w.name).map(w=>{
    const txc = w.txc !== undefined ? w.txc : (w.bonus || 0);
-   return `<b>${w.name}</b> (TxC ${txc>=0?"+":""}${txc}, Danni: ${w.damage||"—"})`;
+   const dDice = w.dmgDice || w.damage || "—";
+   const dMod = w.dmgMod ? (w.dmgMod >= 0 ? "+"+w.dmgMod : w.dmgMod) : "";
+   return `<b>${w.name}</b> (TxC ${txc>=0?"+":""}${txc} | Danni: ${dDice}${dMod})`;
  }).join("<br>")||"Nessuna arma";
  
  const conditions=(t.sheet?.conditions||[]).join(", ")||"Nessuna";
  const ac=(Number(t.sheet?.ac)||0)+(t.sheet?.armor?.equipped?Number(t.sheet.armor.ac)||0:0)+(t.sheet?.shield?.equipped?Number(t.sheet.shield.bonus)||0:0);
- $("selected").innerHTML=`<b>${t.name}</b><br>Tipo: ${t.type}<br>PF: <b class="hp">${t.hp}/${t.maxHp}</b><br>Movimento: <b>${t.sheet?.movementUsed||0}/${t.sheet?.speed||9}</b><hr><b>⚔️ Attacchi</b><br>${weaponText}<br>CA: <b>${ac}</b><br>Condizioni: ${conditions}<br><span class="muted">I dadi si tirano fisicamente.</span>`;
+ const initMod=t.sheet?.initMod||0;
+ const profBonus=t.sheet?.profBonus||2;
+ 
+ $("selected").innerHTML=`<b>${t.name}</b><br>Tipo: ${t.type}<br>PF: <b class="hp">${t.hp}/${t.maxHp}</b><br>Movimento: <b>${t.sheet?.movementUsed||0}/${t.sheet?.speed||9}</b><br>Mod. Iniziativa: <b>${initMod>=0?"+":""}${initMod}</b><br>Bonus Comp.: <b>+${profBonus}</b><hr><b>⚔️ Attacchi</b><br>${weaponText}<br>CA: <b>${ac}</b><br>Condizioni: ${conditions}<br><span class="muted">I dadi si tirano fisicamente.</span>`;
  $("combatPanel").style.display="block";
 }
 
@@ -227,6 +234,8 @@ function openSheet(){
  if(selected===null)return;editingSheet=selected;const t=state.tokens[selected],s=t.sheet||defaultSheet(t.name);
  $("sheetTitle").textContent="Scheda: "+t.name;$("fName").value=s.name;$("fClass").value=s.class;$("fLevel").value=s.level;$("fRace").value=s.race;$("fBackground").value=s.background;$("fAC").value=s.ac;$("fHP").value=t.hp;$("fMaxHP").value=t.maxHp;$("fSpeed").value=s.speed;
  $("fInit").value=t.init;
+ $("fInitMod").value=s.initMod||0;
+ $("fProfBonus").value=s.profBonus||2;
  
  $("stats").innerHTML=abilities.map(a=>{
    const st=s.stats[a]||10;
@@ -242,13 +251,14 @@ function openSheet(){
 
  $("skills").innerHTML=skillList.map(x=>`<label style="display:inline-block;margin:4px"><input type="checkbox" data-skill="${x}" ${s.proficiencies.includes(x)?"checked":""}> ${x}</label>`).join("")+"<br><b>Tiri salvezza:</b><br>"+abilities.map(x=>`<label style="display:inline-block;margin:4px"><input type="checkbox" data-save="${x}" ${s.saves.includes(x)?"checked":""}> ${x}</label>`).join("");
  
- // QUI HO AGGIUNTO IL CAMPO TXC AL POSTO DEL VECCHIO BONUS
  $("weapons").innerHTML=(s.weapons||[]).map(w=>{
    const txc = w.txc !== undefined ? w.txc : (w.bonus || 0);
+   const dDice = w.dmgDice || w.damage || "";
    return `<div class="weapon-row">
      <input data-w="name" value="${w.name||""}" placeholder="Nome arma">
      <input data-w="txc" type="number" value="${txc}" title="Tiro per Colpire (+X)" placeholder="TxC">
-     <input data-w="damage" value="${w.damage||""}" placeholder="Danni (es. 1d8+3)">
+     <input data-w="dmgDice" value="${dDice}" placeholder="Dadi (1d8)">
+     <input data-w="dmgMod" type="number" value="${w.dmgMod||0}" placeholder="Mod Danno">
      <input data-w="type" value="${w.type||""}" placeholder="Tipo">
      <button class="removeWeapon">✕</button>
    </div>`;
@@ -263,8 +273,7 @@ function openSheet(){
 }
 $("openSheet").onclick=openSheet;$("closeSheet").onclick=()=>$("sheetModal").classList.remove("show");
 
-// AGGIUNTA DEL CAMPO txc AL MOMENTO DELLA CREAZIONE DI UNA NUOVA ARMA
-$("addWeapon").onclick=()=>{if(editingSheet!==null){state.tokens[editingSheet].sheet.weapons.push({name:"",txc:0,damage:"",type:""});openSheet()}};
+$("addWeapon").onclick=()=>{if(editingSheet!==null){state.tokens[editingSheet].sheet.weapons.push({name:"",txc:0,dmgDice:"",dmgMod:0,type:""});openSheet()}};
 $("addItem").onclick=()=>{if(editingSheet!==null){state.tokens[editingSheet].sheet.inventory.push({name:"",qty:1,type:"Oggetto"});openSheet()}};
 $("addCondition").onclick=()=>{if(editingSheet!==null){const c=prompt("Nome della condizione:");if(c){state.tokens[editingSheet].sheet.conditions.push(c);openSheet()}}};
 
@@ -278,11 +287,14 @@ $("saveSheet").onclick=()=>{
  
  s.proficiencies=[...$("skills").querySelectorAll("[data-skill]:checked")].map(i=>i.dataset.skill);s.saves=[...$("skills").querySelectorAll("[data-save]:checked")].map(i=>i.dataset.save);
  
- // SALVATAGGIO DEL NUOVO DATO txc
+ s.initMod=Number($("fInitMod").value)||0;
+ s.profBonus=Number($("fProfBonus").value)||2;
+ 
  s.weapons=[...$("weapons").querySelectorAll(".weapon-row")].map(r=>({
    name:r.querySelector('[data-w="name"]').value,
    txc:Number(r.querySelector('[data-w="txc"]').value)||0,
-   damage:r.querySelector('[data-w="damage"]').value,
+   dmgDice:r.querySelector('[data-w="dmgDice"]').value,
+   dmgMod:Number(r.querySelector('[data-w="dmgMod"]').value)||0,
    type:r.querySelector('[data-w="type"]').value
  }));
  
