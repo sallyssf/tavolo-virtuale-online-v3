@@ -35,6 +35,24 @@ button{background:#26323d;color:#eee;border:1px solid #465361;border-radius:6px;
 <div class="top"><b>Tavolo Virtuale</b><div class="switch"><button id="dmBtn" class="on">DM</button><button id="playerBtn">Giocatore</button></div></div>
 <p id="status" class="status disconnected">● Connessione in corso…</p>
 <h3>INIZIATIVA</h3><div id="initiative"></div><button id="endTurn" style="width:100%">FINE TURNO</button>
+<div class="card" id="dmPanel" style="display:none">
+<h3>👑 Pannello DM</h3>
+<div class="muted">Controllo completo del tavolo.</div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-top:8px">
+<button id="dmAddEnemy">+ Mostro</button><button id="dmAddNpc">+ PNG</button>
+<button id="dmHealAll">❤️ Cura selezionata</button><button id="dmDamageAll">⚔️ Danno selezionato</button>
+</div>
+<div style="margin-top:8px">
+<label>Iniziativa/turno</label>
+<input id="turnInput" type="number" min="0" placeholder="Numero turno">
+<button id="setTurn">Imposta turno</button>
+</div>
+<div style="margin-top:8px">
+<label>Condizione</label>
+<select id="conditionSelect"><option value="">Nessuna</option><option>Accecato</option><option>Affascinato</option><option>Impaurito</option><option>Incapacitato</option><option>Invisibile</option><option>Paralizzato</option><option>Privo di sensi</option><option>Stordito</option><option>Avvelenato</option></select>
+<button id="setCondition">Applica</button>
+</div>
+</div>
 <h3>SELEZIONATO</h3><div class="card" id="selected">Nessuna pedina selezionata</div>
 <div style="display:flex;gap:6px"><button id="openSheet" style="flex:1">📜 Scheda</button><button id="renameBtn">✏️</button><button id="deleteBtn">🗑️</button></div>
 <div class="card" id="combatPanel" style="display:none">
@@ -46,7 +64,7 @@ button{background:#26323d;color:#eee;border:1px solid #465361;border-radius:6px;
 </div>
 <h3>CHAT</h3><div class="chat" id="chat"></div><div class="chatbox"><input id="msg" placeholder="Scrivi..."><button id="send">➤</button></div>
 </aside>
-<div class="bottom"><button id="addHero">+ Eroe</button><button id="addEnemy">+ Mostro</button><button id="addNpc">+ PNG</button><button id="addObj">+ Oggetto</button><button id="toggleMove">🚶 Movimento</button><span>V4: combattimento, movimento touch/mouse e mappa orizzontale</span><div class="zoom">Zoom <input id="zoom" type="range" min="50" max="160" value="85"><b id="zoomVal">85%</b></div></div>
+<div class="bottom"><button id="addHero">+ Eroe</button><button id="addEnemy">+ Mostro</button><button id="addNpc">+ PNG</button><button id="addObj">+ Oggetto</button><button id="toggleMove">🚶 Movimento</button><button id="toggleDM">👑 Modalità DM</button><span>V4: combattimento, movimento touch/mouse e mappa orizzontale</span><div class="zoom">Zoom <input id="zoom" type="range" min="50" max="160" value="85"><b id="zoomVal">85%</b></div></div>
 </div>
 
 <div class="modal" id="sheetModal"><div class="modalbox">
@@ -60,7 +78,7 @@ button{background:#26323d;color:#eee;border:1px solid #465361;border-radius:6px;
 <div class="section"><h3>Abilità e tiri salvezza</h3><div id="skills"></div></div>
 <div class="section"><h3>⚔️ Armi e attacchi</h3><div id="weapons"></div><button id="addWeapon">+ Aggiungi arma</button></div>
 <div class="section"><h3>🛡️ Armatura e scudo</h3><div id="armor"></div></div>
-<div class="section"><h3>🎒 Inventario ed equipaggiamento</h3><div id="inventory"></div><button id="addItem">+ Aggiungi oggetto</button></div>
+<div class="section"><h3>🌀 Condizioni</h3><div class="muted">Le condizioni vengono gestite dal DM.</div></div><div class="section"><h3>🎒 Inventario ed equipaggiamento</h3><div id="inventory"></div><button id="addItem">+ Aggiungi oggetto</button></div>
 <div class="section"><h3>Condizioni</h3><div id="conditions"></div><button id="addCondition">+ Condizione</button></div>
 <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px"><button id="closeSheet">Chiudi</button><button id="saveSheet" style="background:#2563eb">Salva scheda</button></div>
 </div></div>
@@ -90,7 +108,9 @@ function render(){
  if(selected!==null&&state.tokens[selected])selectToken(selected)
 }
 function selectToken(i){selected=i;const t=state.tokens[i];const weaponText=(t.sheet?.weapons||[]).filter(w=>w.name).map(w=>`${w.name} (${w.bonus>=0?"+":""}${w.bonus}, ${w.damage||"—"})`).join("<br>")||"Nessuna arma";
- $("selected").innerHTML=`<b>${t.name}</b><br>Tipo: ${t.type}<br>PF: <b class="hp">${t.hp}/${t.maxHp}</b><br>Movimento: <b>${t.sheet?.movementUsed||0}/${t.sheet?.speed||9}</b><hr><b>⚔️ Attacchi</b><br>${weaponText}<br><span class="muted">I dadi si tirano fisicamente.</span>`; $("combatPanel").style.display="block"}
+ const conditions=(t.sheet?.conditions||[]).join(", ")||"Nessuna";
+ const ac=(Number(t.sheet?.ac)||0)+(t.sheet?.armor?.equipped?Number(t.sheet.armor.ac)||0:0)+(t.sheet?.shield?.equipped?Number(t.sheet.shield.bonus)||0:0);
+ $("selected").innerHTML=`<b>${t.name}</b><br>Tipo: ${t.type}<br>PF: <b class="hp">${t.hp}/${t.maxHp}</b><br>Movimento: <b>${t.sheet?.movementUsed||0}/${t.sheet?.speed||9}</b><hr><b>⚔️ Attacchi</b><br>${weaponText}<br>CA: <b>${ac}</b><br>Condizioni: ${conditions}<br><span class="muted">I dadi si tirano fisicamente.</span>`; $("combatPanel").style.display="block"}
 function dragToken(ev){
  if(tool!=="select")return;ev.stopPropagation();const i=+ev.currentTarget.dataset.i,t=state.tokens[i];
  if(state.role==="player"&&t.type!=="hero"){alert("In modalità Giocatore puoi spostare solo un eroe.");return}
@@ -161,6 +181,49 @@ function combatChange(amount){
 $("damageBtn").onclick=()=>combatChange(-1);
 $("healBtn").onclick=()=>combatChange(1);
 $("toggleMove").onclick=()=>{movementMode=!movementMode;$("toggleMove").textContent=movementMode?"🚶 Movimento ON":"🚶 Movimento";};
+
+
+function setDMMode(on){
+ dmMode=on;
+ $("dmPanel").style.display=dmMode?"block":"none";
+ $("toggleDM").textContent=dmMode?"👑 DM ON":"👑 Modalità DM";
+ render();
+}
+$("toggleDM").onclick=()=>setDMMode(!dmMode);
+
+function dmSelectedChange(amount){
+ if(selected===null)return;
+ const t=state.tokens[selected];
+ const val=Number(prompt(amount<0?"Danno da applicare:":"PF da recuperare:"));
+ if(!Number.isFinite(val)||val<0)return;
+ t.hp=Math.max(0,Math.min(t.maxHp,t.hp+amount*val));
+ send("hp_change",{id:t.id,hp:t.hp});
+ render();
+}
+$("dmHealAll").onclick=()=>dmMode&&dmSelectedChange(1);
+$("dmDamageAll").onclick=()=>dmMode&&dmSelectedChange(-1);
+
+$("setTurn").onclick=()=>{
+ if(!dmMode)return;
+ const n=Number($("turnInput").value);
+ if(!Number.isFinite(n))return;
+ currentTurn=n;
+ $("turnStatus").textContent="Turno: "+currentTurn;
+ send("turn_change",{turn:currentTurn});
+};
+$("setCondition").onclick=()=>{
+ if(!dmMode||selected===null)return;
+ const c=$("conditionSelect").value;
+ const t=state.tokens[selected];
+ t.sheet=t.sheet||{};
+ t.sheet.conditions=t.sheet.conditions||[];
+ if(c && !t.sheet.conditions.includes(c)) t.sheet.conditions.push(c);
+ send("condition_change",{id:t.id,conditions:t.sheet.conditions});
+ render();
+};
+
+$("dmAddEnemy").onclick=()=>{if(dmMode) addToken("Mostro")};
+$("dmAddNpc").onclick=()=>{if(dmMode) addToken("PNG")};
 
 function connect(){const url=(location.protocol==="https:"?"wss://":"ws://")+location.host;ws=new WebSocket(url);ws.onopen=()=>{$("status").textContent="● Connesso";$("status").className="status connected";send("join")};ws.onclose=()=>{$("status").textContent="● Disconnesso — riconnessione…";$("status").className="status disconnected";setTimeout(connect,2500)};ws.onerror=()=>{$("status").textContent="● Errore WebSocket";$("status").className="status disconnected"};ws.onmessage=e=>{const m=JSON.parse(e.data);if(m.type==="state"){state=m.state;render()}if(m.type==="chat"){$("chat").innerHTML+=`<p><b>Giocatore:</b> ${m.message}</p>`;$("chat").scrollTop=$("chat").scrollHeight}if(m.type==="system")$("chat").innerHTML+=`<p><b>Sistema:</b> ${m.message}</p>`}}
 render();apply();connect();
