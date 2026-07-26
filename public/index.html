@@ -130,10 +130,7 @@ function render(){
    const e=document.createElement("div");
    e.className="token "+t.type+(selected===i?" selected":"");
    e.draggable=false;
-   
-   // --- LA MODIFICA È QUI: Prende in automatico l'iniziale del nome (o "?" se manca) ---
    e.textContent=t.name ? t.name.charAt(0).toUpperCase() : "?";
-   
    e.style.left=t.x+"px";
    e.style.top=t.y+"px";
    e.dataset.i=i;
@@ -219,8 +216,22 @@ function openSheet(){
  if(selected===null)return;editingSheet=selected;const t=state.tokens[selected],s=t.sheet||defaultSheet(t.name);
  $("sheetTitle").textContent="Scheda: "+t.name;$("fName").value=s.name;$("fClass").value=s.class;$("fLevel").value=s.level;$("fRace").value=s.race;$("fBackground").value=s.background;$("fAC").value=s.ac;$("fHP").value=t.hp;$("fMaxHP").value=t.maxHp;$("fSpeed").value=s.speed;
  $("fInit").value=t.init;
- $("stats").innerHTML=abilities.map(a=>`<div class="stat"><b>${a}</b><input data-stat="${a}" type="number" value="${s.stats[a]||10}"><div>Mod: <b>${modifier(s.stats[a]||10)>=0?"+":""}${modifier(s.stats[a]||10)}</b></div></div>`).join("");
- $("stats").querySelectorAll("input").forEach(inp=>inp.oninput=()=>inp.parentElement.querySelector("b").textContent=(modifier(inp.value)>=0?"+":"")+modifier(inp.value));
+ 
+ // QUI HO MODIFICATO LA GENERAZIONE DELLE STATISTICHE
+ $("stats").innerHTML=abilities.map(a=>{
+   const st=s.stats[a]||10;
+   const m=s.statMods&&s.statMods[a]!==undefined?s.statMods[a]:modifier(st);
+   return `<div class="stat"><b>${a}</b><input data-stat="${a}" type="number" value="${st}">
+   <div style="margin-top:6px;display:flex;align-items:center;justify-content:space-between">
+     Mod: <input data-mod="${a}" type="number" value="${m}" style="width:55px;padding:4px">
+   </div></div>`;
+ }).join("");
+ 
+ // AGGIORNO IN AUTOMATICO IL MOD SE CAMBI LA STATISTICA
+ $("stats").querySelectorAll("input[data-stat]").forEach(inp=>inp.oninput=()=>{
+   inp.parentElement.querySelector("input[data-mod]").value=modifier(inp.value);
+ });
+
  $("skills").innerHTML=skillList.map(x=>`<label style="display:inline-block;margin:4px"><input type="checkbox" data-skill="${x}" ${s.proficiencies.includes(x)?"checked":""}> ${x}</label>`).join("")+"<br><b>Tiri salvezza:</b><br>"+abilities.map(x=>`<label style="display:inline-block;margin:4px"><input type="checkbox" data-save="${x}" ${s.saves.includes(x)?"checked":""}> ${x}</label>`).join("");
  $("weapons").innerHTML=(s.weapons||[]).map(w=>`<div class="weapon-row"><input data-w="name" value="${w.name||""}" placeholder="Nome arma"><input data-w="bonus" type="number" value="${w.bonus||0}" title="Bonus"><input data-w="damage" value="${w.damage||""}" placeholder="Danno"><input data-w="type" value="${w.type||""}" placeholder="Tipo danno"><button class="removeWeapon">✕</button></div>`).join("");
  $("weapons").querySelectorAll(".removeWeapon").forEach(b=>b.onclick=()=>b.parentElement.remove());
@@ -234,10 +245,17 @@ $("openSheet").onclick=openSheet;$("closeSheet").onclick=()=>$("sheetModal").cla
 $("addWeapon").onclick=()=>{if(editingSheet!==null){state.tokens[editingSheet].sheet.weapons.push({name:"",bonus:0,damage:"",type:""});openSheet()}};
 $("addItem").onclick=()=>{if(editingSheet!==null){state.tokens[editingSheet].sheet.inventory.push({name:"",qty:1,type:"Oggetto"});openSheet()}};
 $("addCondition").onclick=()=>{if(editingSheet!==null){const c=prompt("Nome della condizione:");if(c){state.tokens[editingSheet].sheet.conditions.push(c);openSheet()}}};
+
 $("saveSheet").onclick=()=>{
  if(editingSheet===null)return;const t=state.tokens[editingSheet],s=t.sheet||defaultSheet(t.name);
  s.name=$("fName").value.trim()||t.name;s.class=$("fClass").value;s.level=Number($("fLevel").value)||1;s.race=$("fRace").value;s.background=$("fBackground").value;s.ac=Number($("fAC").value)||10;s.speed=Number($("fSpeed").value)||9;
- s.stats={};$("stats").querySelectorAll("[data-stat]").forEach(i=>s.stats[i.dataset.stat]=Number(i.value)||10);s.proficiencies=[...$("skills").querySelectorAll("[data-skill]:checked")].map(i=>i.dataset.skill);s.saves=[...$("skills").querySelectorAll("[data-save]:checked")].map(i=>i.dataset.save);
+ 
+ // QUI SALVIAMO SIA IL PUNTEGGIO BASE CHE IL MODIFICATORE
+ s.stats={};s.statMods={};
+ $("stats").querySelectorAll("[data-stat]").forEach(i=>s.stats[i.dataset.stat]=Number(i.value)||10);
+ $("stats").querySelectorAll("[data-mod]").forEach(i=>s.statMods[i.dataset.mod]=Number(i.value)||0);
+ 
+ s.proficiencies=[...$("skills").querySelectorAll("[data-skill]:checked")].map(i=>i.dataset.skill);s.saves=[...$("skills").querySelectorAll("[data-save]:checked")].map(i=>i.dataset.save);
  s.weapons=[...$("weapons").querySelectorAll(".weapon-row")].map(r=>({name:r.querySelector('[data-w="name"]').value,bonus:Number(r.querySelector('[data-w="bonus"]').value)||0,damage:r.querySelector('[data-w="damage"]').value,type:r.querySelector('[data-w="type"]').value}));
  const ar=$("armor").querySelector(".armor-row");
  s.armor={name:ar.querySelector('[data-a="name"]').value,ac:Number(ar.querySelector('[data-a="ac"]').value)||0,equipped:ar.querySelector('[data-a="equipped"]').checked};
