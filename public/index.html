@@ -119,7 +119,7 @@ function apply(){map.style.transform=`translate(${pan.x}px,${pan.y}px) scale(${s
 function render(){
  try{localStorage.setItem("tavoloVirtualeCampaign_"+(currentRoom||"default"),JSON.stringify({tokens:state.tokens,turn:currentTurn,savedAt:new Date().toISOString()}));}catch(e){}
  tokens.innerHTML="";
- state.tokens.forEach((t,i)=>{const e=document.createElement("div");e.className="token "+t.type+(selected===i?" selected":"");e.textContent=t.type==="enemy"?"G":t.type==="hero"?"E":t.type==="npc"?"P":"?";e.style.left=t.x+"px";e.style.top=t.y+"px";e.dataset.i=i;e.onpointerdown=dragToken;e.onclick=()=>selectToken(i);tokens.appendChild(e)});
+ state.tokens.forEach((t,i)=>{const e=document.createElement("div");e.className="token "+t.type+(selected===i?" selected":"");e.draggable=false;e.textContent=t.type==="enemy"?"G":t.type==="hero"?"E":t.type==="npc"?"P":"?";e.style.left=t.x+"px";e.style.top=t.y+"px";e.dataset.i=i;e.onpointerdown=dragToken;e.onclick=()=>selectToken(i);tokens.appendChild(e)});
  initiative.innerHTML="";
  [...state.tokens].sort((a,b)=>b.init-a.init).forEach(t=>{initiative.innerHTML+=`<div class="card row ${state.tokens[state.turn%Math.max(1,state.tokens.length)]?.id===t.id?"initiative-active":""}"><span>${t.name}<br><small class="muted">${t.type}</small></span><b>${t.init}</b></div>`});
  if(selected!==null&&state.tokens[selected])selectToken(selected)
@@ -129,14 +129,41 @@ function selectToken(i){selected=i;const t=state.tokens[i];const weaponText=(t.s
  const ac=(Number(t.sheet?.ac)||0)+(t.sheet?.armor?.equipped?Number(t.sheet.armor.ac)||0:0)+(t.sheet?.shield?.equipped?Number(t.sheet.shield.bonus)||0:0);
  $("selected").innerHTML=`<b>${t.name}</b><br>Tipo: ${t.type}<br>PF: <b class="hp">${t.hp}/${t.maxHp}</b><br>Movimento: <b>${t.sheet?.movementUsed||0}/${t.sheet?.speed||9}</b><hr><b>⚔️ Attacchi</b><br>${weaponText}<br>CA: <b>${ac}</b><br>Condizioni: ${conditions}<br><span class="muted">I dadi si tirano fisicamente.</span>`; $("combatPanel").style.display="block"}
 function dragToken(ev){
- if(tool!=="select")return;ev.stopPropagation();const i=+ev.currentTarget.dataset.i,t=state.tokens[i];
- if(state.role==="player"&&t.type!=="hero"){alert("In modalità Giocatore puoi spostare solo un eroe.");return}
- selectToken(i);const r=map.getBoundingClientRect(),ox=ev.clientX-r.left-t.x*scale,oy=ev.clientY-r.top-t.y*scale;ev.currentTarget.setPointerCapture(ev.pointerId);
+ if(tool!=="select")return;
+ ev.preventDefault();ev.stopPropagation();
+ const el=ev.currentTarget,i=+el.dataset.i,t=state.tokens[i];
+ if(!dmMode && state.role==="player" && t.type!=="hero"){alert("In modalità Giocatore puoi spostare solo un eroe.");return}
+ selectToken(i);
+ const r=map.getBoundingClientRect();
+ const ox=ev.clientX-r.left-t.x*scale,oy=ev.clientY-r.top-t.y*scale;
  const startX=t.x,startY=t.y;
- ev.currentTarget.onpointermove=e=>{const rr=map.getBoundingClientRect();let nx=(e.clientX-rr.left-ox)/scale,ny=(e.clientY-rr.top-oy)/scale;
- if(movementMode){const dist=Math.sqrt((nx-startX)**2+(ny-startY)**2)/50;const max=t.sheet?.speed||9;if(dist>max){const ratio=max/dist;nx=startX+(nx-startX)*ratio;ny=startY+(ny-startY)*ratio}}
- t.x=nx;t.y=ny;ev.currentTarget.style.left=t.x+"px";ev.currentTarget.style.top=t.y+"px";send("token_move",{id:t.id,x:t.x,y:t.y})};
- ev.currentTarget.onpointerup=()=>ev.currentTarget.onpointermove=null
+ let moving=true;
+ el.setPointerCapture?.(ev.pointerId);
+ const move=e=>{
+   if(!moving)return;
+   e.preventDefault();
+   const rr=map.getBoundingClientRect();
+   let nx=(e.clientX-rr.left-ox)/scale,ny=(e.clientY-rr.top-oy)/scale;
+   if(movementMode){
+     const dist=Math.sqrt((nx-startX)**2+(ny-startY)**2)/50;
+     const max=Number(t.sheet?.speed)||9;
+     if(dist>max){const ratio=max/dist;nx=startX+(nx-startX)*ratio;ny=startY+(ny-startY)*ratio}
+   }
+   t.x=nx;t.y=ny;
+   el.style.left=nx+"px";el.style.top=ny+"px";
+ };
+ const end=()=>{
+   if(!moving)return;
+   moving=false;
+   el.releasePointerCapture?.(ev.pointerId);
+   el.removeEventListener("pointermove",move);
+   el.removeEventListener("pointerup",end);
+   el.removeEventListener("pointercancel",end);
+   send("token_move",{id:t.id,x:t.x,y:t.y});
+ };
+ el.addEventListener("pointermove",move);
+ el.addEventListener("pointerup",end);
+ el.addEventListener("pointercancel",end);
 }
 stage.onpointerdown=e=>{if(e.target.closest(".token"))return;dragging=true;stage.classList.add("dragging");start={x:e.clientX-pan.x,y:e.clientY-pan.y};stage.setPointerCapture(e.pointerId)};
 stage.onpointermove=e=>{if(dragging){pan.x=e.clientX-start.x;pan.y=e.clientY-start.y;apply()}};
