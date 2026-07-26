@@ -81,7 +81,15 @@ wss.on("connection", ws => {
       game.tokens.push(m.token); saveRoomState(ws); snapshot();
     } else if (m.type === "update_sheet") {
       const t = game.tokens.find(x => x.id === m.id);
-      if (t) { t.sheet = m.sheet; t.name = m.name || t.name; t.hp = Number(m.hp) || 0; t.maxHp = Number(m.maxHp) || 1; saveRoomState(ws); snapshot(); }
+      if (t) { 
+        t.sheet = m.sheet; 
+        t.name = m.name || t.name; 
+        t.hp = Number(m.hp) || 0; 
+        t.maxHp = Number(m.maxHp) || 1; 
+        if(Number.isFinite(m.init)) t.init = m.init; // <--- Gestione dell'iniziativa aggiunta qui
+        saveRoomState(ws); 
+        snapshot(); 
+      }
     } else if (m.type === "hp_change") {
       const t = game.tokens.find(x => x.id === m.id);
       if (t) { t.hp = Math.max(0, Math.min(t.maxHp, Number(m.hp) || 0)); saveRoomState(ws); snapshot(); }
