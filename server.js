@@ -20,6 +20,7 @@ else if(m.type==="update_sheet"){const t=game.tokens.find(x=>x.id===m.id);if(t){
 else if(m.type==="hp_change"){const t=game.tokens.find(x=>x.id===m.id);if(t){t.hp=Math.max(0,Math.min(t.maxHp,Number(m.hp)||0));snapshot()}}
 else if(m.type==="condition_change"){const t=game.tokens.find(x=>x.id===m.id);if(t){t.sheet=t.sheet||{};t.sheet.conditions=m.conditions||[];snapshot()}}
 else if(m.type==="turn_change"){game.turn=Number(m.turn)||0;snapshot()}
+else if(m.type==="campaign_save"){if(Array.isArray(m.tokens))game.tokens=m.tokens;if(Number.isFinite(m.turn))game.turn=m.turn;snapshot()}
 else if(m.type==="turn_end"){game.turn=(game.turn+1)%Math.max(1,game.tokens.length);snapshot();broadcast({type:"system",message:"Turno successivo."})}
 else if(m.type==="chat")broadcast({type:"chat",message:String(m.message||"").slice(0,500)})})});
 server.listen(PORT,"0.0.0.0",()=>console.log("Tavolo virtuale online sulla porta "+PORT));
