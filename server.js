@@ -1,5 +1,6 @@
 const http=require("http"),fs=require("fs"),path=require("path"),WebSocket=require("ws");
 const PORT=process.env.PORT||8080, PUBLIC=path.join(__dirname,"public");
+const rooms=new Map();
 let game={tokens:[
 {id:"a1",name:"Arannis",type:"hero",hp:19,maxHp:19,init:18,x:360,y:470,sheet:sheet("Arannis","Guerriero")},
 {id:"a2",name:"Theren",type:"hero",hp:24,maxHp:24,init:15,x:420,y:520,sheet:sheet("Theren","Guerriero")},
