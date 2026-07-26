@@ -20,7 +20,12 @@ button{background:#26323d;color:#eee;border:1px solid #465361;border-radius:6px;
 .bottom{grid-column:2/4;background:#0b0f13;border-top:1px solid #39434d;display:flex;gap:8px;align-items:center;padding:10px}.zoom{margin-left:auto;display:flex;align-items:center;gap:6px}
 .modal{position:fixed;inset:0;background:#000b;display:none;align-items:center;justify-content:center;z-index:50}.modal.show{display:flex}.modalbox{background:#1b222a;border:1px solid #465361;border-radius:12px;padding:20px;width:min(900px,94vw);max-height:90vh;overflow:auto}.modalbox.small{width:min(440px,94vw)}
 .form{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.form label{display:flex;flex-direction:column;gap:4px;color:#cbd5e1}.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:10px 0}.stat{background:#111;border:1px solid #39434d;border-radius:7px;padding:8px}.stat input{width:100%;background:#1b222a;color:#fff;border:1px solid #465361;padding:6px}
-.section{border-top:1px solid #39434d;padding-top:10px;margin-top:10px}.weapon-row,.armor-row{display:grid;grid-template-columns:1.4fr .7fr .8fr .8fr 70px;gap:5px;align-items:center;margin-bottom:5px}.weapon-row input,.armor-row input{background:#111;color:#fff;border:1px solid #39434d;padding:6px;min-width:0}.inventory{display:grid;grid-template-columns:1fr 80px 100px 80px;gap:5px;align-items:center;margin-bottom:5px}.inventory input{background:#111;color:#fff;border:1px solid #39434d;padding:6px}.condition{display:inline-block;background:#5b3b00;border:1px solid #a16207;padding:4px 7px;border-radius:12px;margin:3px}.initiative-active{outline:2px solid #facc15}
+.section{border-top:1px solid #39434d;padding-top:10px;margin-top:10px}
+.weapon-row{display:grid;grid-template-columns:1.3fr 0.7fr 1.2fr 0.8fr 35px;gap:5px;align-items:center;margin-bottom:5px}
+.armor-row{display:grid;grid-template-columns:1.4fr .7fr .8fr .8fr 70px;gap:5px;align-items:center;margin-bottom:5px}
+.inventory{display:grid;grid-template-columns:1fr 80px 100px 35px;gap:5px;align-items:center;margin-bottom:5px}
+.weapon-row input,.armor-row input,.inventory input{background:#111;color:#fff;border:1px solid #39434d;padding:6px;min-width:0}
+.condition{display:inline-block;background:#5b3b00;border:1px solid #a16207;padding:4px 7px;border-radius:12px;margin:3px}.initiative-active{outline:2px solid #facc15}
 </style>
 </head>
 <body>
@@ -149,7 +154,13 @@ function selectToken(i){
  selected=i;
  const t=state.tokens[i];
  if(!t)return;
- const weaponText=(t.sheet?.weapons||[]).filter(w=>w.name).map(w=>`${w.name} (${w.bonus>=0?"+":""}${w.bonus}, ${w.damage||"—"})`).join("<br>")||"Nessuna arma";
+ 
+ // QUI HO AGGIORNATO LA VISUALIZZAZIONE DELLE ARMI PER INCLUDERE IL TXC
+ const weaponText=(t.sheet?.weapons||[]).filter(w=>w.name).map(w=>{
+   const txc = w.txc !== undefined ? w.txc : (w.bonus || 0);
+   return `<b>${w.name}</b> (TxC ${txc>=0?"+":""}${txc}, Danni: ${w.damage||"—"})`;
+ }).join("<br>")||"Nessuna arma";
+ 
  const conditions=(t.sheet?.conditions||[]).join(", ")||"Nessuna";
  const ac=(Number(t.sheet?.ac)||0)+(t.sheet?.armor?.equipped?Number(t.sheet.armor.ac)||0:0)+(t.sheet?.shield?.equipped?Number(t.sheet.shield.bonus)||0:0);
  $("selected").innerHTML=`<b>${t.name}</b><br>Tipo: ${t.type}<br>PF: <b class="hp">${t.hp}/${t.maxHp}</b><br>Movimento: <b>${t.sheet?.movementUsed||0}/${t.sheet?.speed||9}</b><hr><b>⚔️ Attacchi</b><br>${weaponText}<br>CA: <b>${ac}</b><br>Condizioni: ${conditions}<br><span class="muted">I dadi si tirano fisicamente.</span>`;
@@ -217,7 +228,6 @@ function openSheet(){
  $("sheetTitle").textContent="Scheda: "+t.name;$("fName").value=s.name;$("fClass").value=s.class;$("fLevel").value=s.level;$("fRace").value=s.race;$("fBackground").value=s.background;$("fAC").value=s.ac;$("fHP").value=t.hp;$("fMaxHP").value=t.maxHp;$("fSpeed").value=s.speed;
  $("fInit").value=t.init;
  
- // QUI HO MODIFICATO LA GENERAZIONE DELLE STATISTICHE
  $("stats").innerHTML=abilities.map(a=>{
    const st=s.stats[a]||10;
    const m=s.statMods&&s.statMods[a]!==undefined?s.statMods[a]:modifier(st);
@@ -226,15 +236,25 @@ function openSheet(){
      Mod: <input data-mod="${a}" type="number" value="${m}" style="width:55px;padding:4px">
    </div></div>`;
  }).join("");
- 
- // AGGIORNO IN AUTOMATICO IL MOD SE CAMBI LA STATISTICA
  $("stats").querySelectorAll("input[data-stat]").forEach(inp=>inp.oninput=()=>{
    inp.parentElement.querySelector("input[data-mod]").value=modifier(inp.value);
  });
 
  $("skills").innerHTML=skillList.map(x=>`<label style="display:inline-block;margin:4px"><input type="checkbox" data-skill="${x}" ${s.proficiencies.includes(x)?"checked":""}> ${x}</label>`).join("")+"<br><b>Tiri salvezza:</b><br>"+abilities.map(x=>`<label style="display:inline-block;margin:4px"><input type="checkbox" data-save="${x}" ${s.saves.includes(x)?"checked":""}> ${x}</label>`).join("");
- $("weapons").innerHTML=(s.weapons||[]).map(w=>`<div class="weapon-row"><input data-w="name" value="${w.name||""}" placeholder="Nome arma"><input data-w="bonus" type="number" value="${w.bonus||0}" title="Bonus"><input data-w="damage" value="${w.damage||""}" placeholder="Danno"><input data-w="type" value="${w.type||""}" placeholder="Tipo danno"><button class="removeWeapon">✕</button></div>`).join("");
+ 
+ // QUI HO AGGIUNTO IL CAMPO TXC AL POSTO DEL VECCHIO BONUS
+ $("weapons").innerHTML=(s.weapons||[]).map(w=>{
+   const txc = w.txc !== undefined ? w.txc : (w.bonus || 0);
+   return `<div class="weapon-row">
+     <input data-w="name" value="${w.name||""}" placeholder="Nome arma">
+     <input data-w="txc" type="number" value="${txc}" title="Tiro per Colpire (+X)" placeholder="TxC">
+     <input data-w="damage" value="${w.damage||""}" placeholder="Danni (es. 1d8+3)">
+     <input data-w="type" value="${w.type||""}" placeholder="Tipo">
+     <button class="removeWeapon">✕</button>
+   </div>`;
+ }).join("");
  $("weapons").querySelectorAll(".removeWeapon").forEach(b=>b.onclick=()=>b.parentElement.remove());
+ 
  $("armor").innerHTML=`<div class="armor-row"><input data-a="name" value="${s.armor?.name||""}" placeholder="Armatura"><input data-a="ac" type="number" value="${s.armor?.ac||0}" placeholder="CA"><label><input data-a="equipped" type="checkbox" ${s.armor?.equipped?"checked":""}> Equip.</label><input data-shield="name" value="${s.shield?.name||""}" placeholder="Scudo"><input data-shield="bonus" type="number" value="${s.shield?.bonus||0}" placeholder="+CA"></div>`;
  $("inventory").innerHTML=(s.inventory||[]).map(it=>`<div class="inventory"><input data-k="name" value="${it.name||""}" placeholder="Oggetto"><input data-k="qty" type="number" value="${it.qty||1}"><input data-k="type" value="${it.type||"Oggetto"}"><button class="removeItem">✕</button></div>`).join("");
  $("inventory").querySelectorAll(".removeItem").forEach(b=>b.onclick=()=>b.parentElement.remove());
@@ -242,7 +262,9 @@ function openSheet(){
  $("sheetModal").classList.add("show");
 }
 $("openSheet").onclick=openSheet;$("closeSheet").onclick=()=>$("sheetModal").classList.remove("show");
-$("addWeapon").onclick=()=>{if(editingSheet!==null){state.tokens[editingSheet].sheet.weapons.push({name:"",bonus:0,damage:"",type:""});openSheet()}};
+
+// AGGIUNTA DEL CAMPO txc AL MOMENTO DELLA CREAZIONE DI UNA NUOVA ARMA
+$("addWeapon").onclick=()=>{if(editingSheet!==null){state.tokens[editingSheet].sheet.weapons.push({name:"",txc:0,damage:"",type:""});openSheet()}};
 $("addItem").onclick=()=>{if(editingSheet!==null){state.tokens[editingSheet].sheet.inventory.push({name:"",qty:1,type:"Oggetto"});openSheet()}};
 $("addCondition").onclick=()=>{if(editingSheet!==null){const c=prompt("Nome della condizione:");if(c){state.tokens[editingSheet].sheet.conditions.push(c);openSheet()}}};
 
@@ -250,13 +272,20 @@ $("saveSheet").onclick=()=>{
  if(editingSheet===null)return;const t=state.tokens[editingSheet],s=t.sheet||defaultSheet(t.name);
  s.name=$("fName").value.trim()||t.name;s.class=$("fClass").value;s.level=Number($("fLevel").value)||1;s.race=$("fRace").value;s.background=$("fBackground").value;s.ac=Number($("fAC").value)||10;s.speed=Number($("fSpeed").value)||9;
  
- // QUI SALVIAMO SIA IL PUNTEGGIO BASE CHE IL MODIFICATORE
  s.stats={};s.statMods={};
  $("stats").querySelectorAll("[data-stat]").forEach(i=>s.stats[i.dataset.stat]=Number(i.value)||10);
  $("stats").querySelectorAll("[data-mod]").forEach(i=>s.statMods[i.dataset.mod]=Number(i.value)||0);
  
  s.proficiencies=[...$("skills").querySelectorAll("[data-skill]:checked")].map(i=>i.dataset.skill);s.saves=[...$("skills").querySelectorAll("[data-save]:checked")].map(i=>i.dataset.save);
- s.weapons=[...$("weapons").querySelectorAll(".weapon-row")].map(r=>({name:r.querySelector('[data-w="name"]').value,bonus:Number(r.querySelector('[data-w="bonus"]').value)||0,damage:r.querySelector('[data-w="damage"]').value,type:r.querySelector('[data-w="type"]').value}));
+ 
+ // SALVATAGGIO DEL NUOVO DATO txc
+ s.weapons=[...$("weapons").querySelectorAll(".weapon-row")].map(r=>({
+   name:r.querySelector('[data-w="name"]').value,
+   txc:Number(r.querySelector('[data-w="txc"]').value)||0,
+   damage:r.querySelector('[data-w="damage"]').value,
+   type:r.querySelector('[data-w="type"]').value
+ }));
+ 
  const ar=$("armor").querySelector(".armor-row");
  s.armor={name:ar.querySelector('[data-a="name"]').value,ac:Number(ar.querySelector('[data-a="ac"]').value)||0,equipped:ar.querySelector('[data-a="equipped"]').checked};
  s.shield={name:ar.querySelector('[data-shield="name"]').value,bonus:Number(ar.querySelector('[data-shield="bonus"]').value)||0,equipped:!!ar.querySelector('[data-shield="name"]').value};
