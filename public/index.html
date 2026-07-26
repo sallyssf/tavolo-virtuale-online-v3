@@ -10,7 +10,7 @@
 button{background:#26323d;color:#eee;border:1px solid #465361;border-radius:6px;padding:8px;cursor:pointer}button:hover{background:#344454}
 .tool.active,.switch .on{background:#2563eb}.tool span{display:block;font-size:21px}
 .stage{position:relative;overflow:hidden;background:#050505;cursor:grab}.stage.dragging{cursor:grabbing}
-#map{position:absolute;width:1100px;height:1650px;background:url('/map.png') center/100% 100%;transform-origin:0 0;touch-action:none}.token{touch-action:none}
+#map{position:absolute;width:1650px;height:1100px;background:url('/map.png') center/100% 100%;transform-origin:0 0;touch-action:none}.token{touch-action:none}
 .grid{position:absolute;inset:0;background-image:linear-gradient(#ffffff35 1px,transparent 1px),linear-gradient(90deg,#ffffff35 1px,transparent 1px);background-size:50px 50px}
 .token{position:absolute;width:52px;height:52px;border:3px solid white;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:bold;color:white;cursor:grab;z-index:5;user-select:none;box-shadow:0 2px 8px #000}
 .token.hero{background:#2563eb}.token.enemy{background:#b91c1c}.token.npc{background:#a16207}.token.object{background:#475569}.token.selected{outline:4px solid #facc15}
@@ -46,7 +46,7 @@ button{background:#26323d;color:#eee;border:1px solid #465361;border-radius:6px;
 </div>
 <h3>CHAT</h3><div class="chat" id="chat"></div><div class="chatbox"><input id="msg" placeholder="Scrivi..."><button id="send">➤</button></div>
 </aside>
-<div class="bottom"><button id="addHero">+ Eroe</button><button id="addEnemy">+ Mostro</button><button id="addNpc">+ PNG</button><button id="addObj">+ Oggetto</button><button id="toggleMove">🚶 Movimento</button><span>V4: combattimento e movimento touch/mouse</span><div class="zoom">Zoom <input id="zoom" type="range" min="50" max="160" value="85"><b id="zoomVal">85%</b></div></div>
+<div class="bottom"><button id="addHero">+ Eroe</button><button id="addEnemy">+ Mostro</button><button id="addNpc">+ PNG</button><button id="addObj">+ Oggetto</button><button id="toggleMove">🚶 Movimento</button><span>V4: combattimento, movimento touch/mouse e mappa orizzontale</span><div class="zoom">Zoom <input id="zoom" type="range" min="50" max="160" value="85"><b id="zoomVal">85%</b></div></div>
 </div>
 
 <div class="modal" id="sheetModal"><div class="modalbox">
@@ -76,7 +76,7 @@ let state={tokens:[
 {id:"e1",name:"Goblin",type:"enemy",hp:7,maxHp:7,init:12,x:650,y:540,sheet:defaultSheet("Goblin","Mostro")},
 {id:"e2",name:"Goblin",type:"enemy",hp:7,maxHp:7,init:8,x:720,y:620,sheet:defaultSheet("Goblin","Mostro")}
 ],turn:0};
-let ws=null,selected=null,tool="select",scale=.85,pan={x:0,y:0},dragging=false,start={x:0,y:0},nameMode=null,nameType=null,editingSheet=null,movementMode=false;
+let ws=null,selected=null,tool="select",scale=.70,pan={x:0,y:0},dragging=false,start={x:0,y:0},nameMode=null,nameType=null,editingSheet=null,movementMode=false;
 const $=id=>document.getElementById(id);
 function send(type,payload={}){if(ws&&ws.readyState===1)ws.send(JSON.stringify({type,...payload}))}
 function apply(){map.style.transform=`translate(${pan.x}px,${pan.y}px) scale(${scale})`;zoomVal.textContent=Math.round(scale*100)+"%"}
@@ -101,7 +101,7 @@ function dragToken(ev){
 stage.onpointerdown=e=>{if(e.target.closest(".token"))return;dragging=true;stage.classList.add("dragging");start={x:e.clientX-pan.x,y:e.clientY-pan.y};stage.setPointerCapture(e.pointerId)};
 stage.onpointermove=e=>{if(dragging){pan.x=e.clientX-start.x;pan.y=e.clientY-start.y;apply()}};
 stage.onpointerup=()=>{dragging=false;stage.classList.remove("dragging")};
-document.querySelectorAll(".tool").forEach(b=>b.onclick=()=>{tool=b.dataset.tool;document.querySelectorAll(".tool").forEach(x=>x.classList.remove("active"));b.classList.add("active");if(tool==="grid")grid.style.display=grid.style.display==="none"?"block":"none";if(tool==="reset"){pan={x:0,y:0};scale=.85;zoom.value=85;apply()}});
+document.querySelectorAll(".tool").forEach(b=>b.onclick=()=>{tool=b.dataset.tool;document.querySelectorAll(".tool").forEach(x=>x.classList.remove("active"));b.classList.add("active");if(tool==="grid")grid.style.display=grid.style.display==="none"?"block":"none";if(tool==="reset"){pan={x:0,y:0};scale=.85;zoom.value=70;apply()}});
 zoom.oninput=e=>{scale=e.target.value/100;apply()};
 
 function openName(mode,type){nameMode=mode;nameType=type;$("nameTitle").textContent=mode==="rename"?"Rinomina pedina":"Crea nuova pedina";$("nameInput").value=mode==="rename"&&selected!==null?state.tokens[selected].name:"";$("nameModal").classList.add("show");setTimeout(()=>$("nameInput").focus(),50)}
