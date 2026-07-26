@@ -89,7 +89,8 @@ button{background:#26323d;color:#eee;border:1px solid #465361;border-radius:6px;
 <div class="form">
 <label>Nome<input id="fName"></label><label>Classe<input id="fClass"></label><label>Livello<input id="fLevel" type="number" min="1"></label>
 <label>Razza/specie<input id="fRace"></label><label>Background<input id="fBackground"></label><label>CA<input id="fAC" type="number"></label>
-<label>PF attuali<input id="fHP" type="number"></label><label>PF massimi<input id="fMaxHP" type="number"></label><label>Velocità<input id="fSpeed" type="number"></label>
+<!-- QUI HO AGGIUNTO IL CAMPO INIZIATIVA -->
+<label>PF attuali<input id="fHP" type="number"></label><label>PF massimi<input id="fMaxHP" type="number"></label><label>Velocità<input id="fSpeed" type="number"></label><label>Iniziativa<input id="fInit" type="number"></label>
 </div>
 <h3>Caratteristiche</h3><div class="stats" id="stats"></div>
 <div class="section"><h3>Abilità e tiri salvezza</h3><div id="skills"></div></div>
@@ -215,6 +216,7 @@ $("addHero").onclick=()=>openName("add","hero");$("addEnemy").onclick=()=>openNa
 function openSheet(){
  if(selected===null)return;editingSheet=selected;const t=state.tokens[selected],s=t.sheet||defaultSheet(t.name);
  $("sheetTitle").textContent="Scheda: "+t.name;$("fName").value=s.name;$("fClass").value=s.class;$("fLevel").value=s.level;$("fRace").value=s.race;$("fBackground").value=s.background;$("fAC").value=s.ac;$("fHP").value=t.hp;$("fMaxHP").value=t.maxHp;$("fSpeed").value=s.speed;
+ $("fInit").value=t.init; // <--- VALORE INIZIATIVA CARICATO QUI
  $("stats").innerHTML=abilities.map(a=>`<div class="stat"><b>${a}</b><input data-stat="${a}" type="number" value="${s.stats[a]||10}"><div>Mod: <b>${modifier(s.stats[a]||10)>=0?"+":""}${modifier(s.stats[a]||10)}</b></div></div>`).join("");
  $("stats").querySelectorAll("input").forEach(inp=>inp.oninput=()=>inp.parentElement.querySelector("b").textContent=(modifier(inp.value)>=0?"+":"")+modifier(inp.value));
  $("skills").innerHTML=skillList.map(x=>`<label style="display:inline-block;margin:4px"><input type="checkbox" data-skill="${x}" ${s.proficiencies.includes(x)?"checked":""}> ${x}</label>`).join("")+"<br><b>Tiri salvezza:</b><br>"+abilities.map(x=>`<label style="display:inline-block;margin:4px"><input type="checkbox" data-save="${x}" ${s.saves.includes(x)?"checked":""}> ${x}</label>`).join("");
@@ -239,7 +241,16 @@ $("saveSheet").onclick=()=>{
  s.armor={name:ar.querySelector('[data-a="name"]').value,ac:Number(ar.querySelector('[data-a="ac"]').value)||0,equipped:ar.querySelector('[data-a="equipped"]').checked};
  s.shield={name:ar.querySelector('[data-shield="name"]').value,bonus:Number(ar.querySelector('[data-shield="bonus"]').value)||0,equipped:!!ar.querySelector('[data-shield="name"]').value};
  s.inventory=[...$("inventory").querySelectorAll(".inventory")].map(r=>({name:r.querySelector('[data-k="name"]').value,qty:Number(r.querySelector('[data-k="qty"]').value)||1,type:r.querySelector('[data-k="type"]').value}));
- t.name=s.name;t.hp=Number($("fHP").value)||0;t.maxHp=Number($("fMaxHP").value)||1;t.sheet=s;send("update_sheet",{id:t.id,sheet:s,name:t.name,hp:t.hp,maxHp:t.maxHp});$("sheetModal").classList.remove("show");render();
+ 
+ t.name=s.name;
+ t.hp=Number($("fHP").value)||0;
+ t.maxHp=Number($("fMaxHP").value)||1;
+ t.init=Number($("fInit").value)||0; // <--- VALORE INIZIATIVA LETTO E SALVATO QUI
+ t.sheet=s;
+ 
+ send("update_sheet",{id:t.id,sheet:s,name:t.name,hp:t.hp,maxHp:t.maxHp,init:t.init}); // <--- INVIATO AL SERVER QUI
+ $("sheetModal").classList.remove("show");
+ render();
 };
 $("endTurn").onclick=()=>send("turn_end");
 function sendChat(){const x=$("msg").value.trim();if(x){send("chat",{message:x});$("msg").value=""}}$("send").onclick=sendChat;$("msg").onkeydown=e=>{if(e.key==="Enter")sendChat()};
