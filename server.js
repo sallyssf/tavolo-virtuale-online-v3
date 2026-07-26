@@ -11,6 +11,8 @@ function broadcast(x){const m=JSON.stringify(x);wss.clients.forEach(c=>{if(c.rea
 function snapshot(){broadcast({type:"state",state:game})}
 wss.on("connection",ws=>{ws.send(JSON.stringify({type:"state",state:game}));ws.on("message",raw=>{let m;try{m=JSON.parse(raw)}catch{return}
 if(m.type==="token_move"){let t=game.tokens.find(x=>x.id===m.id);if(t){t.x=Number(m.x);t.y=Number(m.y);snapshot()}}
+else if(m.type==="rename_token"){let t=game.tokens.find(x=>x.id===m.id);if(t){t.name=String(m.name||"").slice(0,40);snapshot()}}
+else if(m.type==="delete_token"){game.tokens=game.tokens.filter(x=>x.id!==m.id);snapshot()}
 else if(m.type==="add_token"){game.tokens.push(m.token);snapshot()}
 else if(m.type==="state"){game=m.state;snapshot()}
 else if(m.type==="fog_add"){game.fogHoles.push(m.hole);snapshot()}
