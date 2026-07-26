@@ -62,6 +62,7 @@ button{background:#26323d;color:#eee;border:1px solid #465361;border-radius:6px;
 <label>Iniziativa/turno</label>
 <input id="turnInput" type="number" min="0" placeholder="Numero turno">
 <button id="setTurn">Imposta turno</button>
+<div class="muted" id="turnStatus">Turno: 0</div>
 </div>
 <div style="margin-top:8px">
 <label>Condizione</label>
@@ -106,28 +107,55 @@ const abilities=["Forza","Destrezza","Costituzione","Intelligenza","Saggezza","C
 const skillList=["Acrobazia","Addestrare Animali","Arcano","Atletica","Furtività","Indagare","Inganno","Intimidire","Intuizione","Medicina","Natura","Percezione","Persuasione","Rapidità di Mano","Religione","Sopravvivenza","Storia","Intrattenere"];
 function defaultSheet(name,cls){return{name,class:cls||"Guerriero",level:1,race:"",background:"",ac:10,speed:9,movementUsed:0,stats:{Forza:10,Destrezza:10,Costituzione:10,Intelligenza:10,Saggezza:10,Carisma:10},proficiencies:[],saves:[],inventory:[],weapons:[],armor:{name:"",ac:0,equipped:false},shield:{name:"",bonus:0,equipped:false},conditions:[]}}
 function modifier(v){return Math.floor((Number(v)-10)/2)}
+
 let state={tokens:[
 {id:"a1",name:"Arannis",type:"hero",hp:19,maxHp:19,init:18,x:360,y:470,sheet:defaultSheet("Arannis")},
 {id:"a2",name:"Theren",type:"hero",hp:24,maxHp:24,init:15,x:420,y:520,sheet:defaultSheet("Theren")},
 {id:"e1",name:"Goblin",type:"enemy",hp:7,maxHp:7,init:12,x:650,y:540,sheet:defaultSheet("Goblin","Mostro")},
 {id:"e2",name:"Goblin",type:"enemy",hp:7,maxHp:7,init:8,x:720,y:620,sheet:defaultSheet("Goblin","Mostro")}
 ],turn:0};
-let ws=null,selected=null,tool="select",scale=.70,pan={x:0,y:0},dragging=false,start={x:0,y:0},nameMode=null,nameType=null,editingSheet=null,movementMode=false;
+
+let ws=null,selected=null,tool="select",scale=.70,pan={x:0,y:0},dragging=false,start={x:0,y:0},nameMode=null,nameType=null,editingSheet=null,movementMode=false,dmMode=false,currentRoom="",currentTurn=0;
+
 const $=id=>document.getElementById(id);
+const stage=$("stage"), map=$("map"), grid=$("grid"), tokens=$("tokens"), initiative=$("initiative"), zoom=$("zoom"), zoomVal=$("zoomVal");
+
 function send(type,payload={}){if(ws&&ws.readyState===1)ws.send(JSON.stringify({type,...payload}))}
 function apply(){map.style.transform=`translate(${pan.x}px,${pan.y}px) scale(${scale})`;zoomVal.textContent=Math.round(scale*100)+"%"}
+
 function render(){
  try{localStorage.setItem("tavoloVirtualeCampaign_"+(currentRoom||"default"),JSON.stringify({tokens:state.tokens,turn:currentTurn,savedAt:new Date().toISOString()}));}catch(e){}
  tokens.innerHTML="";
- state.tokens.forEach((t,i)=>{const e=document.createElement("div");e.className="token "+t.type+(selected===i?" selected":"");e.draggable=false;e.textContent=t.type==="enemy"?"G":t.type==="hero"?"E":t.type==="npc"?"P":"?";e.style.left=t.x+"px";e.style.top=t.y+"px";e.dataset.i=i;e.onpointerdown=dragToken;e.onclick=()=>selectToken(i);tokens.appendChild(e)});
+ state.tokens.forEach((t,i)=>{
+   const e=document.createElement("div");
+   e.className="token "+t.type+(selected===i?" selected":"");
+   e.draggable=false;
+   e.textContent=t.type==="enemy"?"G":t.type==="hero"?"E":t.type==="npc"?"P":"?";
+   e.style.left=t.x+"px";
+   e.style.top=t.y+"px";
+   e.dataset.i=i;
+   e.onpointerdown=dragToken;
+   e.onclick=()=>selectToken(i);
+   tokens.appendChild(e);
+ });
  initiative.innerHTML="";
- [...state.tokens].sort((a,b)=>b.init-a.init).forEach(t=>{initiative.innerHTML+=`<div class="card row ${state.tokens[state.turn%Math.max(1,state.tokens.length)]?.id===t.id?"initiative-active":""}"><span>${t.name}<br><small class="muted">${t.type}</small></span><b>${t.init}</b></div>`});
- if(selected!==null&&state.tokens[selected])selectToken(selected)
+ [...state.tokens].sort((a,b)=>b.init-a.init).forEach(t=>{
+   initiative.innerHTML+=`<div class="card row ${state.tokens[state.turn%Math.max(1,state.tokens.length)]?.id===t.id?"initiative-active":""}"><span>${t.name}<br><small class="muted">${t.type}</small></span><b>${t.init}</b></div>`;
+ });
+ if(selected!==null&&state.tokens[selected])selectToken(selected);
 }
-function selectToken(i){selected=i;const t=state.tokens[i];const weaponText=(t.sheet?.weapons||[]).filter(w=>w.name).map(w=>`${w.name} (${w.bonus>=0?"+":""}${w.bonus}, ${w.damage||"—"})`).join("<br>")||"Nessuna arma";
+
+function selectToken(i){
+ selected=i;
+ const t=state.tokens[i];
+ if(!t)return;
+ const weaponText=(t.sheet?.weapons||[]).filter(w=>w.name).map(w=>`${w.name} (${w.bonus>=0?"+":""}${w.bonus}, ${w.damage||"—"})`).join("<br>")||"Nessuna arma";
  const conditions=(t.sheet?.conditions||[]).join(", ")||"Nessuna";
  const ac=(Number(t.sheet?.ac)||0)+(t.sheet?.armor?.equipped?Number(t.sheet.armor.ac)||0:0)+(t.sheet?.shield?.equipped?Number(t.sheet.shield.bonus)||0:0);
- $("selected").innerHTML=`<b>${t.name}</b><br>Tipo: ${t.type}<br>PF: <b class="hp">${t.hp}/${t.maxHp}</b><br>Movimento: <b>${t.sheet?.movementUsed||0}/${t.sheet?.speed||9}</b><hr><b>⚔️ Attacchi</b><br>${weaponText}<br>CA: <b>${ac}</b><br>Condizioni: ${conditions}<br><span class="muted">I dadi si tirano fisicamente.</span>`; $("combatPanel").style.display="block"}
+ $("selected").innerHTML=`<b>${t.name}</b><br>Tipo: ${t.type}<br>PF: <b class="hp">${t.hp}/${t.maxHp}</b><br>Movimento: <b>${t.sheet?.movementUsed||0}/${t.sheet?.speed||9}</b><hr><b>⚔️ Attacchi</b><br>${weaponText}<br>CA: <b>${ac}</b><br>Condizioni: ${conditions}<br><span class="muted">I dadi si tirano fisicamente.</span>`;
+ $("combatPanel").style.display="block";
+}
+
 function dragToken(ev){
  if(tool!=="select")return;
  ev.preventDefault();ev.stopPropagation();
@@ -139,6 +167,7 @@ function dragToken(ev){
  const startX=t.x,startY=t.y;
  let moving=true;
  el.setPointerCapture?.(ev.pointerId);
+
  const move=e=>{
    if(!moving)return;
    e.preventDefault();
@@ -152,22 +181,26 @@ function dragToken(ev){
    t.x=nx;t.y=ny;
    el.style.left=nx+"px";el.style.top=ny+"px";
  };
- const end=()=>{
+
+ const end=e=>{
    if(!moving)return;
    moving=false;
    el.releasePointerCapture?.(ev.pointerId);
-   el.removeEventListener("pointermove",move);
-   el.removeEventListener("pointerup",end);
-   el.removeEventListener("pointercancel",end);
+   window.removeEventListener("pointermove",move);
+   window.removeEventListener("pointerup",end);
+   window.removeEventListener("pointercancel",end);
    send("token_move",{id:t.id,x:t.x,y:t.y});
  };
- el.addEventListener("pointermove",move);
- el.addEventListener("pointerup",end);
- el.addEventListener("pointercancel",end);
+
+ window.addEventListener("pointermove",move);
+ window.addEventListener("pointerup",end);
+ window.addEventListener("pointercancel",end);
 }
+
 stage.onpointerdown=e=>{if(e.target.closest(".token"))return;dragging=true;stage.classList.add("dragging");start={x:e.clientX-pan.x,y:e.clientY-pan.y};stage.setPointerCapture(e.pointerId)};
 stage.onpointermove=e=>{if(dragging){pan.x=e.clientX-start.x;pan.y=e.clientY-start.y;apply()}};
 stage.onpointerup=()=>{dragging=false;stage.classList.remove("dragging")};
+
 document.querySelectorAll(".tool").forEach(b=>b.onclick=()=>{tool=b.dataset.tool;document.querySelectorAll(".tool").forEach(x=>x.classList.remove("active"));b.classList.add("active");if(tool==="grid")grid.style.display=grid.style.display==="none"?"block":"none";if(tool==="reset"){pan={x:0,y:0};scale=.85;zoom.value=70;apply()}});
 zoom.oninput=e=>{scale=e.target.value/100;apply()};
 
@@ -191,7 +224,7 @@ function openSheet(){
  $("inventory").innerHTML=(s.inventory||[]).map(it=>`<div class="inventory"><input data-k="name" value="${it.name||""}" placeholder="Oggetto"><input data-k="qty" type="number" value="${it.qty||1}"><input data-k="type" value="${it.type||"Oggetto"}"><button class="removeItem">✕</button></div>`).join("");
  $("inventory").querySelectorAll(".removeItem").forEach(b=>b.onclick=()=>b.parentElement.remove());
  $("conditions").innerHTML=(s.conditions||[]).map(c=>`<span class="condition">${c}</span>`).join("");
- $("sheetModal").classList.add("show")
+ $("sheetModal").classList.add("show");
 }
 $("openSheet").onclick=openSheet;$("closeSheet").onclick=()=>$("sheetModal").classList.remove("show");
 $("addWeapon").onclick=()=>{if(editingSheet!==null){state.tokens[editingSheet].sheet.weapons.push({name:"",bonus:0,damage:"",type:""});openSheet()}};
@@ -206,12 +239,11 @@ $("saveSheet").onclick=()=>{
  s.armor={name:ar.querySelector('[data-a="name"]').value,ac:Number(ar.querySelector('[data-a="ac"]').value)||0,equipped:ar.querySelector('[data-a="equipped"]').checked};
  s.shield={name:ar.querySelector('[data-shield="name"]').value,bonus:Number(ar.querySelector('[data-shield="bonus"]').value)||0,equipped:!!ar.querySelector('[data-shield="name"]').value};
  s.inventory=[...$("inventory").querySelectorAll(".inventory")].map(r=>({name:r.querySelector('[data-k="name"]').value,qty:Number(r.querySelector('[data-k="qty"]').value)||1,type:r.querySelector('[data-k="type"]').value}));
- t.name=s.name;t.hp=Number($("fHP").value)||0;t.maxHp=Number($("fMaxHP").value)||1;t.sheet=s;send("update_sheet",{id:t.id,sheet:s,name:t.name,hp:t.hp,maxHp:t.maxHp});$("sheetModal").classList.remove("show");render()
+ t.name=s.name;t.hp=Number($("fHP").value)||0;t.maxHp=Number($("fMaxHP").value)||1;t.sheet=s;send("update_sheet",{id:t.id,sheet:s,name:t.name,hp:t.hp,maxHp:t.maxHp});$("sheetModal").classList.remove("show");render();
 };
 $("endTurn").onclick=()=>send("turn_end");
 function sendChat(){const x=$("msg").value.trim();if(x){send("chat",{message:x});$("msg").value=""}}$("send").onclick=sendChat;$("msg").onkeydown=e=>{if(e.key==="Enter")sendChat()};
 $("dmBtn").onclick=()=>{state.role="dm";$("dmBtn").classList.add("on");$("playerBtn").classList.remove("on")};$("playerBtn").onclick=()=>{state.role="player";$("playerBtn").classList.add("on");$("dmBtn").classList.remove("on")};
-
 
 function combatChange(amount){
  if(selected===null)return;
@@ -225,7 +257,6 @@ function combatChange(amount){
 $("damageBtn").onclick=()=>combatChange(-1);
 $("healBtn").onclick=()=>combatChange(1);
 $("toggleMove").onclick=()=>{movementMode=!movementMode;$("toggleMove").textContent=movementMode?"🚶 Movimento ON":"🚶 Movimento";};
-
 
 function setDMMode(on){
  dmMode=on;
@@ -252,7 +283,7 @@ $("setTurn").onclick=()=>{
  const n=Number($("turnInput").value);
  if(!Number.isFinite(n))return;
  currentTurn=n;
- $("turnStatus").textContent="Turno: "+currentTurn;
+ if($("turnStatus")) $("turnStatus").textContent="Turno: "+currentTurn;
  send("turn_change",{turn:currentTurn});
 };
 $("setCondition").onclick=()=>{
@@ -266,14 +297,10 @@ $("setCondition").onclick=()=>{
  render();
 };
 
-$("dmAddEnemy").onclick=()=>{if(dmMode) addToken("Mostro")};
-$("dmAddNpc").onclick=()=>{if(dmMode) addToken("PNG")};
+$("dmAddEnemy").onclick=()=>{if(dmMode) openName("add","enemy")};
+$("dmAddNpc").onclick=()=>{if(dmMode) openName("add","npc")};
 
-
-
-function makeRoomCode(){
- return Math.random().toString(36).substring(2,8).toUpperCase();
-}
+function makeRoomCode(){ return Math.random().toString(36).substring(2,8).toUpperCase(); }
 function createRoom(){
  const name=$("campaignName").value.trim()||"Nuova campagna";
  const code=makeRoomCode();
@@ -315,7 +342,7 @@ function loadLocalCampaign(){
    if(!raw){$("saveStatus").textContent="Nessun salvataggio trovato";return;}
    const data=JSON.parse(raw);
    if(data.tokens) state.tokens=data.tokens;
-   if(Number.isFinite(data.turn)){currentTurn=data.turn;$("turnStatus").textContent="Turno: "+currentTurn;}
+   if(Number.isFinite(data.turn)){currentTurn=data.turn;if($("turnStatus"))$("turnStatus").textContent="Turno: "+currentTurn;}
    render();
    $("saveStatus").textContent="Partita caricata";
  }catch(e){$("saveStatus").textContent="Errore nel caricamento";}
