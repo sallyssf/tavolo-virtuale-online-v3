@@ -1,32 +1,133 @@
-<!doctype html><html lang="it"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Sentiero Selvaggio</title>
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Tavolo Virtuale</title>
 <style>
-body{margin:0;background:#111;color:#eee;font:14px system-ui;height:100vh;overflow:hidden}.app{display:grid;grid-template-columns:74px 1fr 300px;grid-template-rows:1fr 70px;height:100vh}.toolbar{background:#0b0f13;padding:8px;display:flex;flex-direction:column;gap:8px}.tool{background:transparent;color:#eee;border:0;padding:8px;cursor:pointer}.tool.active{background:#26323d;border-radius:8px}.tool span{display:block;font-size:22px}.stage{overflow:hidden;background:#050505;cursor:grab}.stage.dragging{cursor:grabbing}#map{position:absolute;width:900px;height:1350px;background:url('/map.png') center/100% 100%;transform-origin:0 0}.grid{position:absolute;inset:0;background-image:linear-gradient(#ffffff35 1px,transparent 1px),linear-gradient(90deg,#ffffff35 1px,transparent 1px);background-size:50px 50px}.fog{display:none!important}.hole{position:absolute;border-radius:50%;box-shadow:0 0 0 9999px #000d}.token{position:absolute;width:52px;height:52px;border:3px solid white;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:bold;color:white;cursor:move;z-index:5}.hero{background:#2563eb}.enemy{background:#b91c1c}.npc{background:#a16207}.object{background:#475569}.side{background:#1b222a;padding:14px;overflow:auto;border-left:1px solid #39434d}.top{display:flex;justify-content:space-between}.switch button,.bottom button{background:#26323d;color:#eee;border:1px solid #465361;padding:8px;cursor:pointer}.switch .on{background:#3b82f6}.card{background:#151b21;border:1px solid #39434d;border-radius:8px;padding:10px;margin:7px 0}.row{display:flex;justify-content:space-between}.hp,.connected{color:#86efac}.disconnected{color:#fca5a5}.chat{height:120px;overflow:auto;border:1px solid #39434d;padding:8px}.chatbox{display:flex;gap:5px;margin-top:5px}.chatbox input{flex:1;background:#111;color:white;border:1px solid #39434d;padding:8px}.bottom{grid-column:2/4;background:#0b0f13;border-top:1px solid #39434d;display:flex;gap:10px;align-items:center;padding:10px}.zoom{margin-left:auto}
-</style></head><body>
-<div class="app"><div class="toolbar"><button class="tool active" data-tool="select"><span>↖</span>Seleziona</button><button class="tool" data-tool="grid"><span>▦</span>Griglia</button><button class="tool" data-tool="reset"><span>↺</span>Reset</button></div>
-<div class="stage" id="stage"><div id="map"><div class="grid" id="grid"></div><div class="fog" id="fog"></div><div id="tokens"></div></div></div>
-<aside class="side"><div class="top"><b>Sentiero Selvaggio</b><div class="switch"><button id="dm" class="on">DM</button><button id="player">Giocatore</button></div></div><p id="status" class="disconnected">● Connessione in corso…</p><h3>INIZIATIVA</h3><div id="initiative"></div><button id="endTurn" style="width:100%;padding:10px">FINE TURNO</button><h3>SELEZIONATO</h3><div class="card" id="selected">Nessuna pedina selezionata</div><div class="selected-actions"><button id="renameBtn">✏️ Rinomina</button><button id="deleteBtn">🗑️ Elimina</button></div><h3>CHAT</h3><div class="chat" id="chat"></div><div class="chatbox"><input id="msg" placeholder="Scrivi..."><button id="send">➤</button></div></aside>
-<div class="bottom"><button id="addHero">+ Eroe</button><button id="addEnemy">+ Mostro</button><button id="addNpc">+ PNG</button><button id="addObj">+ Oggetto</button><span>Stato condiviso via WebSocket</span><div class="zoom">Zoom <input id="zoom" type="range" min="50" max="160" value="85"><b id="zoomVal">85%</b></div></div></div>
-<div class="modal" id="modal"><div class="modalbox"><h2 id="modalTitle">Nuova pedina</h2><label>Nome della pedina</label><input id="nameInput" maxlength="40" placeholder="Es. Arannis"><div class="modal-actions"><button id="cancelModal">Annulla</button><button id="confirmModal" class="primary">Conferma</button></div></div></div>
+*{box-sizing:border-box}body{margin:0;background:#111;color:#eee;font:14px system-ui;height:100vh;overflow:hidden}
+.app{display:grid;grid-template-columns:74px 1fr 340px;grid-template-rows:1fr 64px;height:100vh}
+.toolbar{background:#0b0f13;padding:8px;display:flex;flex-direction:column;gap:8px;border-right:1px solid #39434d}
+button{background:#26323d;color:#eee;border:1px solid #465361;border-radius:6px;padding:8px;cursor:pointer}button:hover{background:#344454}
+.tool.active,.switch .on{background:#2563eb}.tool span{display:block;font-size:21px}
+.stage{position:relative;overflow:hidden;background:#050505;cursor:grab}.stage.dragging{cursor:grabbing}
+#map{position:absolute;width:1100px;height:1650px;background:url('/map.png') center/100% 100%;transform-origin:0 0}
+.grid{position:absolute;inset:0;background-image:linear-gradient(#ffffff35 1px,transparent 1px),linear-gradient(90deg,#ffffff35 1px,transparent 1px);background-size:50px 50px}
+.token{position:absolute;width:52px;height:52px;border:3px solid white;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:bold;color:white;cursor:grab;z-index:5;user-select:none;box-shadow:0 2px 8px #000}
+.token.hero{background:#2563eb}.token.enemy{background:#b91c1c}.token.npc{background:#a16207}.token.object{background:#475569}.token.selected{outline:4px solid #facc15}
+.side{background:#1b222a;padding:14px;overflow:auto;border-left:1px solid #39434d}.top{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.status{font-weight:600}.connected{color:#86efac}.disconnected{color:#fca5a5}.card{background:#151b21;border:1px solid #39434d;border-radius:8px;padding:10px;margin:7px 0}.row{display:flex;justify-content:space-between;gap:8px}.hp{color:#86efac}.muted{color:#aab4bf;font-size:12px}
+.chat{height:110px;overflow:auto;border:1px solid #39434d;padding:8px;background:#111}.chatbox{display:flex;gap:5px;margin-top:5px}.chatbox input,.form input{background:#111;color:white;border:1px solid #39434d;padding:8px;border-radius:5px}
+.bottom{grid-column:2/4;background:#0b0f13;border-top:1px solid #39434d;display:flex;gap:8px;align-items:center;padding:10px}.zoom{margin-left:auto;display:flex;align-items:center;gap:6px}
+.modal{position:fixed;inset:0;background:#000b;display:none;align-items:center;justify-content:center;z-index:50}.modal.show{display:flex}.modalbox{background:#1b222a;border:1px solid #465361;border-radius:12px;padding:20px;width:min(900px,94vw);max-height:90vh;overflow:auto}.modalbox.small{width:min(440px,94vw)}
+.form{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.form label{display:flex;flex-direction:column;gap:4px;color:#cbd5e1}.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:10px 0}.stat{background:#111;border:1px solid #39434d;border-radius:7px;padding:8px}.stat input{width:100%;background:#1b222a;color:#fff;border:1px solid #465361;padding:6px}
+.section{border-top:1px solid #39434d;padding-top:10px;margin-top:10px}.inventory{display:grid;grid-template-columns:1fr 80px 100px 80px;gap:5px;align-items:center;margin-bottom:5px}.inventory input{background:#111;color:#fff;border:1px solid #39434d;padding:6px}.condition{display:inline-block;background:#5b3b00;border:1px solid #a16207;padding:4px 7px;border-radius:12px;margin:3px}.initiative-active{outline:2px solid #facc15}
+</style>
+</head>
+<body>
+<div class="app">
+<div class="toolbar">
+<button class="tool active" data-tool="select"><span>↖</span>Seleziona</button>
+<button class="tool" data-tool="grid"><span>▦</span>Griglia</button>
+<button class="tool" data-tool="reset"><span>↺</span>Reset</button>
+</div>
+<div class="stage" id="stage"><div id="map"><div class="grid" id="grid"></div><div id="tokens"></div></div></div>
+<aside class="side">
+<div class="top"><b>Tavolo Virtuale</b><div class="switch"><button id="dmBtn" class="on">DM</button><button id="playerBtn">Giocatore</button></div></div>
+<p id="status" class="status disconnected">● Connessione in corso…</p>
+<h3>INIZIATIVA</h3><div id="initiative"></div><button id="endTurn" style="width:100%">FINE TURNO</button>
+<h3>SELEZIONATO</h3><div class="card" id="selected">Nessuna pedina selezionata</div>
+<div style="display:flex;gap:6px"><button id="openSheet" style="flex:1">📜 Scheda</button><button id="renameBtn">✏️</button><button id="deleteBtn">🗑️</button></div>
+<h3>CHAT</h3><div class="chat" id="chat"></div><div class="chatbox"><input id="msg" placeholder="Scrivi..."><button id="send">➤</button></div>
+</aside>
+<div class="bottom"><button id="addHero">+ Eroe</button><button id="addEnemy">+ Mostro</button><button id="addNpc">+ PNG</button><button id="addObj">+ Oggetto</button><span>V1–V3: schede, inventario, combattimento</span><div class="zoom">Zoom <input id="zoom" type="range" min="50" max="160" value="85"><b id="zoomVal">85%</b></div></div>
+</div>
+
+<div class="modal" id="sheetModal"><div class="modalbox">
+<h2 id="sheetTitle">Scheda personaggio</h2>
+<div class="form">
+<label>Nome<input id="fName"></label><label>Classe<input id="fClass"></label><label>Livello<input id="fLevel" type="number" min="1"></label>
+<label>Razza/specie<input id="fRace"></label><label>Background<input id="fBackground"></label><label>CA<input id="fAC" type="number"></label>
+<label>PF attuali<input id="fHP" type="number"></label><label>PF massimi<input id="fMaxHP" type="number"></label><label>Velocità<input id="fSpeed" type="number"></label>
+</div>
+<h3>Caratteristiche</h3><div class="stats" id="stats"></div>
+<div class="section"><h3>Abilità e tiri salvezza</h3><div id="skills"></div></div>
+<div class="section"><h3>Inventario ed equipaggiamento</h3><div id="inventory"></div><button id="addItem">+ Aggiungi oggetto</button></div>
+<div class="section"><h3>Condizioni</h3><div id="conditions"></div><button id="addCondition">+ Condizione</button></div>
+<div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px"><button id="closeSheet">Chiudi</button><button id="saveSheet" style="background:#2563eb">Salva scheda</button></div>
+</div></div>
+
+<div class="modal" id="nameModal"><div class="modalbox small"><h2 id="nameTitle">Nuova pedina</h2><input id="nameInput" maxlength="40" placeholder="Nome"><div style="display:flex;justify-content:flex-end;gap:8px;margin-top:12px"><button id="cancelName">Annulla</button><button id="confirmName" style="background:#2563eb">Conferma</button></div></div></div>
+
 <script>
-let state={tokens:[{id:"a1",name:"Arannis",type:"hero",hp:19,init:18,x:360,y:470},{id:"a2",name:"Theren",type:"hero",hp:24,init:15,x:420,y:520},{id:"e1",name:"Goblin",type:"enemy",hp:7,init:12,x:650,y:540},{id:"e2",name:"Goblin",type:"enemy",hp:7,init:8,x:720,y:620}],fogHoles:[{x:290,y:410,w:230,h:230}],turn:0};
-let ws=null,selected=null,tool="select",scale=.85,pan={x:0,y:0},dragging=false,start={x:0,y:0};
-const map=document.getElementById("map"),stage=document.getElementById("stage"),tokens=document.getElementById("tokens"),fog=document.getElementById("fog"),status=document.getElementById("status");
-function statusSet(t,ok){status.textContent="● "+t;status.className=ok?"connected":"disconnected"}
+const abilities=["Forza","Destrezza","Costituzione","Intelligenza","Saggezza","Carisma"];
+const skillList=["Acrobazia","Addestrare Animali","Arcano","Atletica","Furtività","Indagare","Inganno","Intimidire","Intuizione","Medicina","Natura","Percezione","Persuasione","Rapidità di Mano","Religione","Sopravvivenza","Storia","Intrattenere"];
+function defaultSheet(name,cls){return{name,class:cls||"Guerriero",level:1,race:"",background:"",ac:10,speed:9,stats:{Forza:10,Destrezza:10,Costituzione:10,Intelligenza:10,Saggezza:10,Carisma:10},proficiencies:[],saves:[],inventory:[],conditions:[]}}
+function modifier(v){return Math.floor((Number(v)-10)/2)}
+let state={tokens:[
+{id:"a1",name:"Arannis",type:"hero",hp:19,maxHp:19,init:18,x:360,y:470,sheet:defaultSheet("Arannis")},
+{id:"a2",name:"Theren",type:"hero",hp:24,maxHp:24,init:15,x:420,y:520,sheet:defaultSheet("Theren")},
+{id:"e1",name:"Goblin",type:"enemy",hp:7,maxHp:7,init:12,x:650,y:540,sheet:defaultSheet("Goblin","Mostro")},
+{id:"e2",name:"Goblin",type:"enemy",hp:7,maxHp:7,init:8,x:720,y:620,sheet:defaultSheet("Goblin","Mostro")}
+],turn:0};
+let ws=null,selected=null,tool="select",scale=.85,pan={x:0,y:0},dragging=false,start={x:0,y:0},nameMode=null,nameType=null,editingSheet=null;
+const $=id=>document.getElementById(id);
 function send(type,payload={}){if(ws&&ws.readyState===1)ws.send(JSON.stringify({type,...payload}))}
 function apply(){map.style.transform=`translate(${pan.x}px,${pan.y}px) scale(${scale})`;zoomVal.textContent=Math.round(scale*100)+"%"}
-function render(){tokens.innerHTML="";state.tokens.forEach((t,i)=>{let e=document.createElement("div");e.className="token "+t.type;e.textContent=t.type==="enemy"?"G":t.type==="hero"?"E":"?";e.style.left=t.x+"px";e.style.top=t.y+"px";e.dataset.i=i;e.onpointerdown=dragToken;e.onclick=()=>selectToken(i);tokens.appendChild(e)});fog.querySelectorAll(".hole").forEach((e,i)=>{if(i)e.remove()});state.fogHoles.slice(1).forEach(h=>{let e=document.createElement("div");e.className="hole";e.style.cssText=`width:${h.w}px;height:${h.h}px;left:${h.x}px;top:${h.y}px`;fog.appendChild(e)});initiative.innerHTML="";[...state.tokens].sort((a,b)=>b.init-a.init).forEach(t=>{initiative.innerHTML+=`<div class="card row"><span>${t.name}<br><small>${t.type}</small></span><b>${t.init}</b></div>`})}
-function selectToken(i){selected=i;let t=state.tokens[i];document.getElementById("selected").innerHTML=`<b>${t.name}</b><br>Tipo: ${t.type}<br>PF: <b class="hp">${t.hp}</b>`}
-let modalMode=null, modalTokenType=null;
-function openModal(mode,type=null){modalMode=mode;modalTokenType=type;document.getElementById("modalTitle").textContent=mode==="rename"?"Rinomina pedina":"Crea nuova pedina";document.getElementById("nameInput").value=mode==="rename"&&selected!==null?state.tokens[selected].name:"";document.getElementById("modal").classList.add("show");setTimeout(()=>document.getElementById("nameInput").focus(),50)}
-function closeModal(){document.getElementById("modal").classList.remove("show")}
-function confirmModal(){let name=document.getElementById("nameInput").value.trim();if(!name)return;if(modalMode==="rename"&&selected!==null){let t=state.tokens[selected];t.name=name;send("rename_token",{id:t.id,name});render();selectToken(selected)}else if(modalMode==="add"){send("add_token",{token:{id:Math.random().toString(36).slice(2),name,type:modalTokenType,hp:modalTokenType==="enemy"?8:20,init:Math.floor(Math.random()*18)+1,x:350+Math.random()*250,y:500+Math.random()*300}})}closeModal()}
-document.getElementById("cancelModal").onclick=closeModal;document.getElementById("confirmModal").onclick=confirmModal;document.getElementById("nameInput").onkeydown=e=>{if(e.key==="Enter")confirmModal();if(e.key==="Escape")closeModal()};document.getElementById("modal").onclick=e=>{if(e.target.id==="modal")closeModal()};document.getElementById("renameBtn").onclick=()=>{if(selected!==null)openModal("rename")};document.getElementById("deleteBtn").onclick=()=>{if(selected===null)return;if(confirm("Eliminare questa pedina?")){send("delete_token",{id:state.tokens[selected].id});selected=null;document.getElementById("selected").textContent="Nessuna pedina selezionata"}};
-function dragToken(ev){if(tool!=="select")return;ev.stopPropagation();let i=+ev.currentTarget.dataset.i;selectToken(i);let r=map.getBoundingClientRect(),ox=ev.clientX-r.left-state.tokens[i].x*scale,oy=ev.clientY-r.top-state.tokens[i].y*scale;ev.currentTarget.setPointerCapture(ev.pointerId);ev.currentTarget.onpointermove=e=>{let rr=map.getBoundingClientRect();state.tokens[i].x=(e.clientX-rr.left-ox)/scale;state.tokens[i].y=(e.clientY-rr.top-oy)/scale;ev.currentTarget.style.left=state.tokens[i].x+"px";ev.currentTarget.style.top=state.tokens[i].y+"px";send("token_move",{id:state.tokens[i].id,x:state.tokens[i].x,y:state.tokens[i].y})};ev.currentTarget.onpointerup=()=>{ev.currentTarget.onpointermove=null}}
-stage.onpointerdown=e=>{if(e.target.closest(".token"))return;if(tool==="fog"){let r=map.getBoundingClientRect(),x=(e.clientX-r.left)/scale,y=(e.clientY-r.top)/scale,h={x:x-90,y:y-90,w:180,h:180};state.fogHoles.push(h);send("fog_add",{hole:h});render();return}dragging=true;stage.classList.add("dragging");start={x:e.clientX-pan.x,y:e.clientY-pan.y};stage.setPointerCapture(e.pointerId)};stage.onpointermove=e=>{if(dragging){pan.x=e.clientX-start.x;pan.y=e.clientY-start.y;apply()}};stage.onpointerup=()=>{dragging=false;stage.classList.remove("dragging")};
+function render(){
+ tokens.innerHTML="";
+ state.tokens.forEach((t,i)=>{const e=document.createElement("div");e.className="token "+t.type+(selected===i?" selected":"");e.textContent=t.type==="enemy"?"G":t.type==="hero"?"E":t.type==="npc"?"P":"?";e.style.left=t.x+"px";e.style.top=t.y+"px";e.dataset.i=i;e.onpointerdown=dragToken;e.onclick=()=>selectToken(i);tokens.appendChild(e)});
+ initiative.innerHTML="";
+ [...state.tokens].sort((a,b)=>b.init-a.init).forEach(t=>{initiative.innerHTML+=`<div class="card row ${state.tokens[state.turn%Math.max(1,state.tokens.length)]?.id===t.id?"initiative-active":""}"><span>${t.name}<br><small class="muted">${t.type}</small></span><b>${t.init}</b></div>`});
+ if(selected!==null&&state.tokens[selected])selectToken(selected)
+}
+function selectToken(i){selected=i;const t=state.tokens[i];$("selected").innerHTML=`<b>${t.name}</b><br>Tipo: ${t.type}<br>PF: <b class="hp">${t.hp}/${t.maxHp}</b><br><span class="muted">Apri la scheda per modificare</span>`}
+function dragToken(ev){
+ if(tool!=="select")return;ev.stopPropagation();const i=+ev.currentTarget.dataset.i,t=state.tokens[i];
+ if(state.role==="player"&&t.type!=="hero"){alert("In modalità Giocatore puoi spostare solo un eroe.");return}
+ selectToken(i);const r=map.getBoundingClientRect(),ox=ev.clientX-r.left-t.x*scale,oy=ev.clientY-r.top-t.y*scale;ev.currentTarget.setPointerCapture(ev.pointerId);
+ ev.currentTarget.onpointermove=e=>{const rr=map.getBoundingClientRect();t.x=(e.clientX-rr.left-ox)/scale;t.y=(e.clientY-rr.top-oy)/scale;ev.currentTarget.style.left=t.x+"px";ev.currentTarget.style.top=t.y+"px";send("token_move",{id:t.id,x:t.x,y:t.y})};
+ ev.currentTarget.onpointerup=()=>ev.currentTarget.onpointermove=null
+}
+stage.onpointerdown=e=>{if(e.target.closest(".token"))return;dragging=true;stage.classList.add("dragging");start={x:e.clientX-pan.x,y:e.clientY-pan.y};stage.setPointerCapture(e.pointerId)};
+stage.onpointermove=e=>{if(dragging){pan.x=e.clientX-start.x;pan.y=e.clientY-start.y;apply()}};
+stage.onpointerup=()=>{dragging=false;stage.classList.remove("dragging")};
 document.querySelectorAll(".tool").forEach(b=>b.onclick=()=>{tool=b.dataset.tool;document.querySelectorAll(".tool").forEach(x=>x.classList.remove("active"));b.classList.add("active");if(tool==="grid")grid.style.display=grid.style.display==="none"?"block":"none";if(tool==="reset"){pan={x:0,y:0};scale=.85;zoom.value=85;apply()}});
 zoom.oninput=e=>{scale=e.target.value/100;apply()};
-addHero.onclick=()=>openModal("add","hero");addEnemy.onclick=()=>openModal("add","enemy");addNpc.onclick=()=>openModal("add","npc");addObj.onclick=()=>openModal("add","object");
-function sendChat(){let t=msg.value.trim();if(t){send("chat",{message:t});msg.value=""}}send.onclick=sendChat;msg.onkeydown=e=>{if(e.key==="Enter")sendChat()};endTurn.onclick=()=>send("turn_end");
-function connect(){const url=(location.protocol==="https:"?"wss://":"ws://")+location.host;statusSet("Connessione in corso…",false);ws=new WebSocket(url);ws.onopen=()=>{statusSet("Connesso",true);send("join")};ws.onclose=()=>{statusSet("Disconnesso — riconnessione…",false);setTimeout(connect,2500)};ws.onerror=()=>statusSet("Errore WebSocket",false);ws.onmessage=e=>{let m=JSON.parse(e.data);if(m.type==="state"){state=m.state;render()}if(m.type==="chat"){chat.innerHTML+=`<p><b>${m.from}:</b> ${m.message}</p>`}if(m.type==="system"){chat.innerHTML+=`<p><b>Sistema:</b> ${m.message}</p>`}}}
+
+function openName(mode,type){nameMode=mode;nameType=type;$("nameTitle").textContent=mode==="rename"?"Rinomina pedina":"Crea nuova pedina";$("nameInput").value=mode==="rename"&&selected!==null?state.tokens[selected].name:"";$("nameModal").classList.add("show");setTimeout(()=>$("nameInput").focus(),50)}
+function closeName(){$("nameModal").classList.remove("show")}
+$("confirmName").onclick=()=>{const name=$("nameInput").value.trim();if(!name)return;if(nameMode==="rename"&&selected!==null){const t=state.tokens[selected];t.name=name;t.sheet.name=name;send("rename_token",{id:t.id,name});render()}else send("add_token",{token:{id:Math.random().toString(36).slice(2),name,type:nameType,hp:nameType==="enemy"?8:20,maxHp:nameType==="enemy"?8:20,init:Math.floor(Math.random()*18)+1,x:350+Math.random()*250,y:500+Math.random()*300,sheet:defaultSheet(name,nameType==="enemy"?"Mostro":"Guerriero")}});closeName()};
+$("cancelName").onclick=closeName;$("nameInput").onkeydown=e=>{if(e.key==="Enter")$("confirmName").click();if(e.key==="Escape")closeName()};
+$("renameBtn").onclick=()=>selected!==null&&openName("rename");
+$("deleteBtn").onclick=()=>{if(selected!==null&&confirm("Eliminare questa pedina?")){send("delete_token",{id:state.tokens[selected].id});selected=null;$("selected").textContent="Nessuna pedina selezionata"}};
+$("addHero").onclick=()=>openName("add","hero");$("addEnemy").onclick=()=>openName("add","enemy");$("addNpc").onclick=()=>openName("add","npc");$("addObj").onclick=()=>openName("add","object");
+
+function openSheet(){
+ if(selected===null)return;editingSheet=selected;const t=state.tokens[selected],s=t.sheet||defaultSheet(t.name);
+ $("sheetTitle").textContent="Scheda: "+t.name;$("fName").value=s.name;$("fClass").value=s.class;$("fLevel").value=s.level;$("fRace").value=s.race;$("fBackground").value=s.background;$("fAC").value=s.ac;$("fHP").value=t.hp;$("fMaxHP").value=t.maxHp;$("fSpeed").value=s.speed;
+ $("stats").innerHTML=abilities.map(a=>`<div class="stat"><b>${a}</b><input data-stat="${a}" type="number" value="${s.stats[a]||10}"><div>Mod: <b>${modifier(s.stats[a]||10)>=0?"+":""}${modifier(s.stats[a]||10)}</b></div></div>`).join("");
+ $("stats").querySelectorAll("input").forEach(inp=>inp.oninput=()=>inp.parentElement.querySelector("b").textContent=(modifier(inp.value)>=0?"+":"")+modifier(inp.value));
+ $("skills").innerHTML=skillList.map(x=>`<label style="display:inline-block;margin:4px"><input type="checkbox" data-skill="${x}" ${s.proficiencies.includes(x)?"checked":""}> ${x}</label>`).join("")+"<br><b>Tiri salvezza:</b><br>"+abilities.map(x=>`<label style="display:inline-block;margin:4px"><input type="checkbox" data-save="${x}" ${s.saves.includes(x)?"checked":""}> ${x}</label>`).join("");
+ $("inventory").innerHTML=(s.inventory||[]).map(it=>`<div class="inventory"><input data-k="name" value="${it.name||""}" placeholder="Oggetto"><input data-k="qty" type="number" value="${it.qty||1}"><input data-k="type" value="${it.type||"Oggetto"}"><button class="removeItem">✕</button></div>`).join("");
+ $("inventory").querySelectorAll(".removeItem").forEach(b=>b.onclick=()=>b.parentElement.remove());
+ $("conditions").innerHTML=(s.conditions||[]).map(c=>`<span class="condition">${c}</span>`).join("");
+ $("sheetModal").classList.add("show")
+}
+$("openSheet").onclick=openSheet;$("closeSheet").onclick=()=>$("sheetModal").classList.remove("show");
+$("addItem").onclick=()=>{if(editingSheet!==null){state.tokens[editingSheet].sheet.inventory.push({name:"",qty:1,type:"Oggetto"});openSheet()}};
+$("addCondition").onclick=()=>{if(editingSheet!==null){const c=prompt("Nome della condizione:");if(c){state.tokens[editingSheet].sheet.conditions.push(c);openSheet()}}};
+$("saveSheet").onclick=()=>{
+ if(editingSheet===null)return;const t=state.tokens[editingSheet],s=t.sheet||defaultSheet(t.name);
+ s.name=$("fName").value.trim()||t.name;s.class=$("fClass").value;s.level=Number($("fLevel").value)||1;s.race=$("fRace").value;s.background=$("fBackground").value;s.ac=Number($("fAC").value)||10;s.speed=Number($("fSpeed").value)||9;
+ s.stats={};$("stats").querySelectorAll("[data-stat]").forEach(i=>s.stats[i.dataset.stat]=Number(i.value)||10);s.proficiencies=[...$("skills").querySelectorAll("[data-skill]:checked")].map(i=>i.dataset.skill);s.saves=[...$("skills").querySelectorAll("[data-save]:checked")].map(i=>i.dataset.save);
+ s.inventory=[...$("inventory").querySelectorAll(".inventory")].map(r=>({name:r.querySelector('[data-k="name"]').value,qty:Number(r.querySelector('[data-k="qty"]').value)||1,type:r.querySelector('[data-k="type"]').value}));
+ t.name=s.name;t.hp=Number($("fHP").value)||0;t.maxHp=Number($("fMaxHP").value)||1;t.sheet=s;send("update_sheet",{id:t.id,sheet:s,name:t.name,hp:t.hp,maxHp:t.maxHp});$("sheetModal").classList.remove("show");render()
+};
+$("endTurn").onclick=()=>send("turn_end");
+function sendChat(){const x=$("msg").value.trim();if(x){send("chat",{message:x});$("msg").value=""}}$("send").onclick=sendChat;$("msg").onkeydown=e=>{if(e.key==="Enter")sendChat()};
+$("dmBtn").onclick=()=>{state.role="dm";$("dmBtn").classList.add("on");$("playerBtn").classList.remove("on")};$("playerBtn").onclick=()=>{state.role="player";$("playerBtn").classList.add("on");$("dmBtn").classList.remove("on")};
+
+function connect(){const url=(location.protocol==="https:"?"wss://":"ws://")+location.host;ws=new WebSocket(url);ws.onopen=()=>{$("status").textContent="● Connesso";$("status").className="status connected";send("join")};ws.onclose=()=>{$("status").textContent="● Disconnesso — riconnessione…";$("status").className="status disconnected";setTimeout(connect,2500)};ws.onerror=()=>{$("status").textContent="● Errore WebSocket";$("status").className="status disconnected"};ws.onmessage=e=>{const m=JSON.parse(e.data);if(m.type==="state"){state=m.state;render()}if(m.type==="chat"){$("chat").innerHTML+=`<p><b>Giocatore:</b> ${m.message}</p>`;$("chat").scrollTop=$("chat").scrollHeight}if(m.type==="system")$("chat").innerHTML+=`<p><b>Sistema:</b> ${m.message}</p>`}}
 render();apply();connect();
-</script></body></html>
+</script>
+</body></html>
