@@ -86,7 +86,7 @@ button{background:#26323d;color:#eee;border:1px solid #465361;border-radius:6px;
 </div>
 <h3>CHAT</h3><div class="chat" id="chat"></div><div class="chatbox"><input id="msg" placeholder="Scrivi..."><button id="send">➤</button></div>
 </aside>
-<div class="bottom"><button id="addHero">+ Eroe</button><button id="addEnemy">+ Mostro</button><button id="addNpc">+ PNG</button><button id="addObj">+ Oggetto</button><button id="toggleMove">🚶 Movimento</button><button id="toggleDM">👑 Modalità DM</button><span>V5: Modificatori avanzati (Iniziativa, Danni)</span><div class="zoom">Zoom <input id="zoom" type="range" min="50" max="160" value="85"><b id="zoomVal">85%</b></div></div>
+<div class="bottom"><button id="addHero">+ Eroe</button><button id="addEnemy">+ Mostro</button><button id="addNpc">+ PNG</button><button id="addObj">+ Oggetto</button><button id="toggleMove">🚶 Movimento</button><button id="toggleDM">👑 Modalità DM</button><span>V6: Iniziativa auto-calcolata</span><div class="zoom">Zoom <input id="zoom" type="range" min="50" max="160" value="85"><b id="zoomVal">85%</b></div></div>
 </div>
 
 <div class="modal" id="sheetModal"><div class="modalbox">
@@ -96,7 +96,7 @@ button{background:#26323d;color:#eee;border:1px solid #465361;border-radius:6px;
 <label>Razza/specie<input id="fRace"></label><label>Background<input id="fBackground"></label><label>CA<input id="fAC" type="number"></label>
 <label>PF attuali<input id="fHP" type="number"></label><label>PF massimi<input id="fMaxHP" type="number"></label><label>Velocità<input id="fSpeed" type="number"></label>
 <label>Mod. Iniziativa<input id="fInitMod" type="number" placeholder="es. +2"></label>
-<label>Lancio Iniziativa<input id="fInit" type="number" placeholder="Lancio D20"></label>
+<label>Lancio Iniziativa (D20)<input id="fInit" type="number" placeholder="Lancio D20"></label>
 <label>Bonus Competenza<input id="fProfBonus" type="number" placeholder="es. +2"></label>
 </div>
 <h3>Caratteristiche</h3><div class="stats" id="stats"></div>
@@ -113,7 +113,9 @@ button{background:#26323d;color:#eee;border:1px solid #465361;border-radius:6px;
 <script>
 const abilities=["Forza","Destrezza","Costituzione","Intelligenza","Saggezza","Carisma"];
 const skillList=["Acrobazia","Addestrare Animali","Arcano","Atletica","Furtività","Indagare","Inganno","Intimidire","Intuizione","Medicina","Natura","Percezione","Persuasione","Rapidità di Mano","Religione","Sopravvivenza","Storia","Intrattenere"];
-function defaultSheet(name,cls){return{name,class:cls||"Guerriero",level:1,race:"",background:"",ac:10,speed:9,movementUsed:0,initMod:0,profBonus:2,stats:{Forza:10,Destrezza:10,Costituzione:10,Intelligenza:10,Saggezza:10,Carisma:10},proficiencies:[],saves:[],inventory:[],weapons:[],armor:{name:"",ac:0,equipped:false},shield:{name:"",bonus:0,equipped:false},conditions:[]}}
+
+// Aggiunto baseInit per non sovrascrivere il d20 puro
+function defaultSheet(name,cls){return{name,class:cls||"Guerriero",level:1,race:"",background:"",ac:10,speed:9,movementUsed:0,initMod:0,baseInit:0,profBonus:2,stats:{Forza:10,Destrezza:10,Costituzione:10,Intelligenza:10,Saggezza:10,Carisma:10},proficiencies:[],saves:[],inventory:[],weapons:[],armor:{name:"",ac:0,equipped:false},shield:{name:"",bonus:0,equipped:false},conditions:[]}}
 function modifier(v){return Math.floor((Number(v)-10)/2)}
 
 let state={tokens:[
@@ -170,7 +172,7 @@ function selectToken(i){
  const initMod=t.sheet?.initMod||0;
  const profBonus=t.sheet?.profBonus||2;
  
- $("selected").innerHTML=`<b>${t.name}</b><br>Tipo: ${t.type}<br>PF: <b class="hp">${t.hp}/${t.maxHp}</b><br>Movimento: <b>${t.sheet?.movementUsed||0}/${t.sheet?.speed||9}</b><br>Mod. Iniziativa: <b>${initMod>=0?"+":""}${initMod}</b><br>Bonus Comp.: <b>+${profBonus}</b><hr><b>⚔️ Attacchi</b><br>${weaponText}<br>CA: <b>${ac}</b><br>Condizioni: ${conditions}<br><span class="muted">I dadi si tirano fisicamente.</span>`;
+ $("selected").innerHTML=`<b>${t.name}</b><br>Tipo: ${t.type}<br>PF: <b class="hp">${t.hp}/${t.maxHp}</b><br>Movimento: <b>${t.sheet?.movementUsed||0}/${t.sheet?.speed||9}</b><br>Mod. Iniziativa: <b>${initMod>=0?"+":""}${initMod}</b> (Totale: ${t.init})<br>Bonus Comp.: <b>+${profBonus}</b><hr><b>⚔️ Attacchi</b><br>${weaponText}<br>CA: <b>${ac}</b><br>Condizioni: ${conditions}<br><span class="muted">I dadi si tirano fisicamente.</span>`;
  $("combatPanel").style.display="block";
 }
 
@@ -233,8 +235,11 @@ $("addHero").onclick=()=>openName("add","hero");$("addEnemy").onclick=()=>openNa
 function openSheet(){
  if(selected===null)return;editingSheet=selected;const t=state.tokens[selected],s=t.sheet||defaultSheet(t.name);
  $("sheetTitle").textContent="Scheda: "+t.name;$("fName").value=s.name;$("fClass").value=s.class;$("fLevel").value=s.level;$("fRace").value=s.race;$("fBackground").value=s.background;$("fAC").value=s.ac;$("fHP").value=t.hp;$("fMaxHP").value=t.maxHp;$("fSpeed").value=s.speed;
- $("fInit").value=t.init;
+ 
+ // Carica il modificatore e il lancio puro, per non sovrascriverli
  $("fInitMod").value=s.initMod||0;
+ $("fInit").value=s.baseInit!==undefined?s.baseInit:(t.init||0);
+ 
  $("fProfBonus").value=s.profBonus||2;
  
  $("stats").innerHTML=abilities.map(a=>{
@@ -287,7 +292,9 @@ $("saveSheet").onclick=()=>{
  
  s.proficiencies=[...$("skills").querySelectorAll("[data-skill]:checked")].map(i=>i.dataset.skill);s.saves=[...$("skills").querySelectorAll("[data-save]:checked")].map(i=>i.dataset.save);
  
+ // Salvataggio dei singoli valori e calcolo finale per la colonna Iniziativa
  s.initMod=Number($("fInitMod").value)||0;
+ s.baseInit=Number($("fInit").value)||0;
  s.profBonus=Number($("fProfBonus").value)||2;
  
  s.weapons=[...$("weapons").querySelectorAll(".weapon-row")].map(r=>({
@@ -306,7 +313,9 @@ $("saveSheet").onclick=()=>{
  t.name=s.name;
  t.hp=Number($("fHP").value)||0;
  t.maxHp=Number($("fMaxHP").value)||1;
- t.init=Number($("fInit").value)||0; 
+ 
+ // Il vero valore dell'iniziativa per il turno è Lancio + Modificatore
+ t.init=s.baseInit + s.initMod; 
  t.sheet=s;
  
  send("update_sheet",{id:t.id,sheet:s,name:t.name,hp:t.hp,maxHp:t.maxHp,init:t.init}); 
