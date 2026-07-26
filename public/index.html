@@ -10,7 +10,7 @@
 button{background:#26323d;color:#eee;border:1px solid #465361;border-radius:6px;padding:8px;cursor:pointer}button:hover{background:#344454}
 .tool.active,.switch .on{background:#2563eb}.tool span{display:block;font-size:21px}
 .stage{position:relative;overflow:hidden;background:#050505;cursor:grab}.stage.dragging{cursor:grabbing}
-#map{position:absolute;width:1100px;height:1650px;background:url('/map.png') center/100% 100%;transform-origin:0 0}
+#map{position:absolute;width:1100px;height:1650px;background:url('/map.png') center/100% 100%;transform-origin:0 0;touch-action:none}.token{touch-action:none}
 .grid{position:absolute;inset:0;background-image:linear-gradient(#ffffff35 1px,transparent 1px),linear-gradient(90deg,#ffffff35 1px,transparent 1px);background-size:50px 50px}
 .token{position:absolute;width:52px;height:52px;border:3px solid white;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:bold;color:white;cursor:grab;z-index:5;user-select:none;box-shadow:0 2px 8px #000}
 .token.hero{background:#2563eb}.token.enemy{background:#b91c1c}.token.npc{background:#a16207}.token.object{background:#475569}.token.selected{outline:4px solid #facc15}
@@ -37,9 +37,16 @@ button{background:#26323d;color:#eee;border:1px solid #465361;border-radius:6px;
 <h3>INIZIATIVA</h3><div id="initiative"></div><button id="endTurn" style="width:100%">FINE TURNO</button>
 <h3>SELEZIONATO</h3><div class="card" id="selected">Nessuna pedina selezionata</div>
 <div style="display:flex;gap:6px"><button id="openSheet" style="flex:1">📜 Scheda</button><button id="renameBtn">✏️</button><button id="deleteBtn">🗑️</button></div>
+<div class="card" id="combatPanel" style="display:none">
+  <b>⚔️ Combattimento</b>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-top:8px">
+    <button id="damageBtn">➖ Danno</button><button id="healBtn">➕ Cura</button>
+  </div>
+  <div class="muted" style="margin-top:6px">Inserisci il totale ottenuto con i dadi fisici.</div>
+</div>
 <h3>CHAT</h3><div class="chat" id="chat"></div><div class="chatbox"><input id="msg" placeholder="Scrivi..."><button id="send">➤</button></div>
 </aside>
-<div class="bottom"><button id="addHero">+ Eroe</button><button id="addEnemy">+ Mostro</button><button id="addNpc">+ PNG</button><button id="addObj">+ Oggetto</button><span>V1–V3: schede, inventario, combattimento</span><div class="zoom">Zoom <input id="zoom" type="range" min="50" max="160" value="85"><b id="zoomVal">85%</b></div></div>
+<div class="bottom"><button id="addHero">+ Eroe</button><button id="addEnemy">+ Mostro</button><button id="addNpc">+ PNG</button><button id="addObj">+ Oggetto</button><button id="toggleMove">🚶 Movimento</button><span>V4: combattimento e movimento touch/mouse</span><div class="zoom">Zoom <input id="zoom" type="range" min="50" max="160" value="85"><b id="zoomVal">85%</b></div></div>
 </div>
 
 <div class="modal" id="sheetModal"><div class="modalbox">
@@ -61,7 +68,7 @@ button{background:#26323d;color:#eee;border:1px solid #465361;border-radius:6px;
 <script>
 const abilities=["Forza","Destrezza","Costituzione","Intelligenza","Saggezza","Carisma"];
 const skillList=["Acrobazia","Addestrare Animali","Arcano","Atletica","Furtività","Indagare","Inganno","Intimidire","Intuizione","Medicina","Natura","Percezione","Persuasione","Rapidità di Mano","Religione","Sopravvivenza","Storia","Intrattenere"];
-function defaultSheet(name,cls){return{name,class:cls||"Guerriero",level:1,race:"",background:"",ac:10,speed:9,stats:{Forza:10,Destrezza:10,Costituzione:10,Intelligenza:10,Saggezza:10,Carisma:10},proficiencies:[],saves:[],inventory:[],conditions:[]}}
+function defaultSheet(name,cls){return{name,class:cls||"Guerriero",level:1,race:"",background:"",ac:10,speed:9,movementUsed:0,stats:{Forza:10,Destrezza:10,Costituzione:10,Intelligenza:10,Saggezza:10,Carisma:10},proficiencies:[],saves:[],inventory:[],conditions:[]}}
 function modifier(v){return Math.floor((Number(v)-10)/2)}
 let state={tokens:[
 {id:"a1",name:"Arannis",type:"hero",hp:19,maxHp:19,init:18,x:360,y:470,sheet:defaultSheet("Arannis")},
@@ -69,7 +76,7 @@ let state={tokens:[
 {id:"e1",name:"Goblin",type:"enemy",hp:7,maxHp:7,init:12,x:650,y:540,sheet:defaultSheet("Goblin","Mostro")},
 {id:"e2",name:"Goblin",type:"enemy",hp:7,maxHp:7,init:8,x:720,y:620,sheet:defaultSheet("Goblin","Mostro")}
 ],turn:0};
-let ws=null,selected=null,tool="select",scale=.85,pan={x:0,y:0},dragging=false,start={x:0,y:0},nameMode=null,nameType=null,editingSheet=null;
+let ws=null,selected=null,tool="select",scale=.85,pan={x:0,y:0},dragging=false,start={x:0,y:0},nameMode=null,nameType=null,editingSheet=null,movementMode=false;
 const $=id=>document.getElementById(id);
 function send(type,payload={}){if(ws&&ws.readyState===1)ws.send(JSON.stringify({type,...payload}))}
 function apply(){map.style.transform=`translate(${pan.x}px,${pan.y}px) scale(${scale})`;zoomVal.textContent=Math.round(scale*100)+"%"}
@@ -80,12 +87,15 @@ function render(){
  [...state.tokens].sort((a,b)=>b.init-a.init).forEach(t=>{initiative.innerHTML+=`<div class="card row ${state.tokens[state.turn%Math.max(1,state.tokens.length)]?.id===t.id?"initiative-active":""}"><span>${t.name}<br><small class="muted">${t.type}</small></span><b>${t.init}</b></div>`});
  if(selected!==null&&state.tokens[selected])selectToken(selected)
 }
-function selectToken(i){selected=i;const t=state.tokens[i];$("selected").innerHTML=`<b>${t.name}</b><br>Tipo: ${t.type}<br>PF: <b class="hp">${t.hp}/${t.maxHp}</b><br><span class="muted">Apri la scheda per modificare</span>`}
+function selectToken(i){selected=i;const t=state.tokens[i];$("selected").innerHTML=`<b>${t.name}</b><br>Tipo: ${t.type}<br>PF: <b class="hp">${t.hp}/${t.maxHp}</b><br>Movimento: <b>${t.sheet?.movementUsed||0}/${t.sheet?.speed||9}</b><br><span class="muted">Apri la scheda per modificare</span>`; $("combatPanel").style.display="block"}
 function dragToken(ev){
  if(tool!=="select")return;ev.stopPropagation();const i=+ev.currentTarget.dataset.i,t=state.tokens[i];
  if(state.role==="player"&&t.type!=="hero"){alert("In modalità Giocatore puoi spostare solo un eroe.");return}
  selectToken(i);const r=map.getBoundingClientRect(),ox=ev.clientX-r.left-t.x*scale,oy=ev.clientY-r.top-t.y*scale;ev.currentTarget.setPointerCapture(ev.pointerId);
- ev.currentTarget.onpointermove=e=>{const rr=map.getBoundingClientRect();t.x=(e.clientX-rr.left-ox)/scale;t.y=(e.clientY-rr.top-oy)/scale;ev.currentTarget.style.left=t.x+"px";ev.currentTarget.style.top=t.y+"px";send("token_move",{id:t.id,x:t.x,y:t.y})};
+ const startX=t.x,startY=t.y;
+ ev.currentTarget.onpointermove=e=>{const rr=map.getBoundingClientRect();let nx=(e.clientX-rr.left-ox)/scale,ny=(e.clientY-rr.top-oy)/scale;
+ if(movementMode){const dist=Math.sqrt((nx-startX)**2+(ny-startY)**2)/50;const max=t.sheet?.speed||9;if(dist>max){const ratio=max/dist;nx=startX+(nx-startX)*ratio;ny=startY+(ny-startY)*ratio}}
+ t.x=nx;t.y=ny;ev.currentTarget.style.left=t.x+"px";ev.currentTarget.style.top=t.y+"px";send("token_move",{id:t.id,x:t.x,y:t.y})};
  ev.currentTarget.onpointerup=()=>ev.currentTarget.onpointermove=null
 }
 stage.onpointerdown=e=>{if(e.target.closest(".token"))return;dragging=true;stage.classList.add("dragging");start={x:e.clientX-pan.x,y:e.clientY-pan.y};stage.setPointerCapture(e.pointerId)};
@@ -126,6 +136,20 @@ $("saveSheet").onclick=()=>{
 $("endTurn").onclick=()=>send("turn_end");
 function sendChat(){const x=$("msg").value.trim();if(x){send("chat",{message:x});$("msg").value=""}}$("send").onclick=sendChat;$("msg").onkeydown=e=>{if(e.key==="Enter")sendChat()};
 $("dmBtn").onclick=()=>{state.role="dm";$("dmBtn").classList.add("on");$("playerBtn").classList.remove("on")};$("playerBtn").onclick=()=>{state.role="player";$("playerBtn").classList.add("on");$("dmBtn").classList.remove("on")};
+
+
+function combatChange(amount){
+ if(selected===null)return;
+ const t=state.tokens[selected];
+ const value=Number(prompt(amount<0?"Quanti danni ha subito?":"Quanti PF recupera?"));
+ if(!Number.isFinite(value)||value<0)return;
+ t.hp=Math.max(0,Math.min(t.maxHp,t.hp+amount*value));
+ send("hp_change",{id:t.id,hp:t.hp});
+ render();
+}
+$("damageBtn").onclick=()=>combatChange(-1);
+$("healBtn").onclick=()=>combatChange(1);
+$("toggleMove").onclick=()=>{movementMode=!movementMode;$("toggleMove").textContent=movementMode?"🚶 Movimento ON":"🚶 Movimento";};
 
 function connect(){const url=(location.protocol==="https:"?"wss://":"ws://")+location.host;ws=new WebSocket(url);ws.onopen=()=>{$("status").textContent="● Connesso";$("status").className="status connected";send("join")};ws.onclose=()=>{$("status").textContent="● Disconnesso — riconnessione…";$("status").className="status disconnected";setTimeout(connect,2500)};ws.onerror=()=>{$("status").textContent="● Errore WebSocket";$("status").className="status disconnected"};ws.onmessage=e=>{const m=JSON.parse(e.data);if(m.type==="state"){state=m.state;render()}if(m.type==="chat"){$("chat").innerHTML+=`<p><b>Giocatore:</b> ${m.message}</p>`;$("chat").scrollTop=$("chat").scrollHeight}if(m.type==="system")$("chat").innerHTML+=`<p><b>Sistema:</b> ${m.message}</p>`}}
 render();apply();connect();
