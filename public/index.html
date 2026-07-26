@@ -20,7 +20,7 @@ button{background:#26323d;color:#eee;border:1px solid #465361;border-radius:6px;
 .bottom{grid-column:2/4;background:#0b0f13;border-top:1px solid #39434d;display:flex;gap:8px;align-items:center;padding:10px}.zoom{margin-left:auto;display:flex;align-items:center;gap:6px}
 .modal{position:fixed;inset:0;background:#000b;display:none;align-items:center;justify-content:center;z-index:50}.modal.show{display:flex}.modalbox{background:#1b222a;border:1px solid #465361;border-radius:12px;padding:20px;width:min(900px,94vw);max-height:90vh;overflow:auto}.modalbox.small{width:min(440px,94vw)}
 .form{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.form label{display:flex;flex-direction:column;gap:4px;color:#cbd5e1}.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:10px 0}.stat{background:#111;border:1px solid #39434d;border-radius:7px;padding:8px}.stat input{width:100%;background:#1b222a;color:#fff;border:1px solid #465361;padding:6px}
-.section{border-top:1px solid #39434d;padding-top:10px;margin-top:10px}.inventory{display:grid;grid-template-columns:1fr 80px 100px 80px;gap:5px;align-items:center;margin-bottom:5px}.inventory input{background:#111;color:#fff;border:1px solid #39434d;padding:6px}.condition{display:inline-block;background:#5b3b00;border:1px solid #a16207;padding:4px 7px;border-radius:12px;margin:3px}.initiative-active{outline:2px solid #facc15}
+.section{border-top:1px solid #39434d;padding-top:10px;margin-top:10px}.weapon-row,.armor-row{display:grid;grid-template-columns:1.4fr .7fr .8fr .8fr 70px;gap:5px;align-items:center;margin-bottom:5px}.weapon-row input,.armor-row input{background:#111;color:#fff;border:1px solid #39434d;padding:6px;min-width:0}.inventory{display:grid;grid-template-columns:1fr 80px 100px 80px;gap:5px;align-items:center;margin-bottom:5px}.inventory input{background:#111;color:#fff;border:1px solid #39434d;padding:6px}.condition{display:inline-block;background:#5b3b00;border:1px solid #a16207;padding:4px 7px;border-radius:12px;margin:3px}.initiative-active{outline:2px solid #facc15}
 </style>
 </head>
 <body>
@@ -58,7 +58,9 @@ button{background:#26323d;color:#eee;border:1px solid #465361;border-radius:6px;
 </div>
 <h3>Caratteristiche</h3><div class="stats" id="stats"></div>
 <div class="section"><h3>Abilità e tiri salvezza</h3><div id="skills"></div></div>
-<div class="section"><h3>Inventario ed equipaggiamento</h3><div id="inventory"></div><button id="addItem">+ Aggiungi oggetto</button></div>
+<div class="section"><h3>⚔️ Armi e attacchi</h3><div id="weapons"></div><button id="addWeapon">+ Aggiungi arma</button></div>
+<div class="section"><h3>🛡️ Armatura e scudo</h3><div id="armor"></div></div>
+<div class="section"><h3>🎒 Inventario ed equipaggiamento</h3><div id="inventory"></div><button id="addItem">+ Aggiungi oggetto</button></div>
 <div class="section"><h3>Condizioni</h3><div id="conditions"></div><button id="addCondition">+ Condizione</button></div>
 <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px"><button id="closeSheet">Chiudi</button><button id="saveSheet" style="background:#2563eb">Salva scheda</button></div>
 </div></div>
@@ -68,7 +70,7 @@ button{background:#26323d;color:#eee;border:1px solid #465361;border-radius:6px;
 <script>
 const abilities=["Forza","Destrezza","Costituzione","Intelligenza","Saggezza","Carisma"];
 const skillList=["Acrobazia","Addestrare Animali","Arcano","Atletica","Furtività","Indagare","Inganno","Intimidire","Intuizione","Medicina","Natura","Percezione","Persuasione","Rapidità di Mano","Religione","Sopravvivenza","Storia","Intrattenere"];
-function defaultSheet(name,cls){return{name,class:cls||"Guerriero",level:1,race:"",background:"",ac:10,speed:9,movementUsed:0,stats:{Forza:10,Destrezza:10,Costituzione:10,Intelligenza:10,Saggezza:10,Carisma:10},proficiencies:[],saves:[],inventory:[],conditions:[]}}
+function defaultSheet(name,cls){return{name,class:cls||"Guerriero",level:1,race:"",background:"",ac:10,speed:9,movementUsed:0,stats:{Forza:10,Destrezza:10,Costituzione:10,Intelligenza:10,Saggezza:10,Carisma:10},proficiencies:[],saves:[],inventory:[],weapons:[],armor:{name:"",ac:0,equipped:false},shield:{name:"",bonus:0,equipped:false},conditions:[]}}
 function modifier(v){return Math.floor((Number(v)-10)/2)}
 let state={tokens:[
 {id:"a1",name:"Arannis",type:"hero",hp:19,maxHp:19,init:18,x:360,y:470,sheet:defaultSheet("Arannis")},
@@ -87,7 +89,8 @@ function render(){
  [...state.tokens].sort((a,b)=>b.init-a.init).forEach(t=>{initiative.innerHTML+=`<div class="card row ${state.tokens[state.turn%Math.max(1,state.tokens.length)]?.id===t.id?"initiative-active":""}"><span>${t.name}<br><small class="muted">${t.type}</small></span><b>${t.init}</b></div>`});
  if(selected!==null&&state.tokens[selected])selectToken(selected)
 }
-function selectToken(i){selected=i;const t=state.tokens[i];$("selected").innerHTML=`<b>${t.name}</b><br>Tipo: ${t.type}<br>PF: <b class="hp">${t.hp}/${t.maxHp}</b><br>Movimento: <b>${t.sheet?.movementUsed||0}/${t.sheet?.speed||9}</b><br><span class="muted">Apri la scheda per modificare</span>`; $("combatPanel").style.display="block"}
+function selectToken(i){selected=i;const t=state.tokens[i];const weaponText=(t.sheet?.weapons||[]).filter(w=>w.name).map(w=>`${w.name} (${w.bonus>=0?"+":""}${w.bonus}, ${w.damage||"—"})`).join("<br>")||"Nessuna arma";
+ $("selected").innerHTML=`<b>${t.name}</b><br>Tipo: ${t.type}<br>PF: <b class="hp">${t.hp}/${t.maxHp}</b><br>Movimento: <b>${t.sheet?.movementUsed||0}/${t.sheet?.speed||9}</b><hr><b>⚔️ Attacchi</b><br>${weaponText}<br><span class="muted">I dadi si tirano fisicamente.</span>`; $("combatPanel").style.display="block"}
 function dragToken(ev){
  if(tool!=="select")return;ev.stopPropagation();const i=+ev.currentTarget.dataset.i,t=state.tokens[i];
  if(state.role==="player"&&t.type!=="hero"){alert("In modalità Giocatore puoi spostare solo un eroe.");return}
@@ -118,18 +121,26 @@ function openSheet(){
  $("stats").innerHTML=abilities.map(a=>`<div class="stat"><b>${a}</b><input data-stat="${a}" type="number" value="${s.stats[a]||10}"><div>Mod: <b>${modifier(s.stats[a]||10)>=0?"+":""}${modifier(s.stats[a]||10)}</b></div></div>`).join("");
  $("stats").querySelectorAll("input").forEach(inp=>inp.oninput=()=>inp.parentElement.querySelector("b").textContent=(modifier(inp.value)>=0?"+":"")+modifier(inp.value));
  $("skills").innerHTML=skillList.map(x=>`<label style="display:inline-block;margin:4px"><input type="checkbox" data-skill="${x}" ${s.proficiencies.includes(x)?"checked":""}> ${x}</label>`).join("")+"<br><b>Tiri salvezza:</b><br>"+abilities.map(x=>`<label style="display:inline-block;margin:4px"><input type="checkbox" data-save="${x}" ${s.saves.includes(x)?"checked":""}> ${x}</label>`).join("");
+ $("weapons").innerHTML=(s.weapons||[]).map(w=>`<div class="weapon-row"><input data-w="name" value="${w.name||""}" placeholder="Nome arma"><input data-w="bonus" type="number" value="${w.bonus||0}" title="Bonus"><input data-w="damage" value="${w.damage||""}" placeholder="Danno"><input data-w="type" value="${w.type||""}" placeholder="Tipo danno"><button class="removeWeapon">✕</button></div>`).join("");
+ $("weapons").querySelectorAll(".removeWeapon").forEach(b=>b.onclick=()=>b.parentElement.remove());
+ $("armor").innerHTML=`<div class="armor-row"><input data-a="name" value="${s.armor?.name||""}" placeholder="Armatura"><input data-a="ac" type="number" value="${s.armor?.ac||0}" placeholder="CA"><label><input data-a="equipped" type="checkbox" ${s.armor?.equipped?"checked":""}> Equip.</label><input data-shield="name" value="${s.shield?.name||""}" placeholder="Scudo"><input data-shield="bonus" type="number" value="${s.shield?.bonus||0}" placeholder="+CA"></div>`;
  $("inventory").innerHTML=(s.inventory||[]).map(it=>`<div class="inventory"><input data-k="name" value="${it.name||""}" placeholder="Oggetto"><input data-k="qty" type="number" value="${it.qty||1}"><input data-k="type" value="${it.type||"Oggetto"}"><button class="removeItem">✕</button></div>`).join("");
  $("inventory").querySelectorAll(".removeItem").forEach(b=>b.onclick=()=>b.parentElement.remove());
  $("conditions").innerHTML=(s.conditions||[]).map(c=>`<span class="condition">${c}</span>`).join("");
  $("sheetModal").classList.add("show")
 }
 $("openSheet").onclick=openSheet;$("closeSheet").onclick=()=>$("sheetModal").classList.remove("show");
+$("addWeapon").onclick=()=>{if(editingSheet!==null){state.tokens[editingSheet].sheet.weapons.push({name:"",bonus:0,damage:"",type:""});openSheet()}};
 $("addItem").onclick=()=>{if(editingSheet!==null){state.tokens[editingSheet].sheet.inventory.push({name:"",qty:1,type:"Oggetto"});openSheet()}};
 $("addCondition").onclick=()=>{if(editingSheet!==null){const c=prompt("Nome della condizione:");if(c){state.tokens[editingSheet].sheet.conditions.push(c);openSheet()}}};
 $("saveSheet").onclick=()=>{
  if(editingSheet===null)return;const t=state.tokens[editingSheet],s=t.sheet||defaultSheet(t.name);
  s.name=$("fName").value.trim()||t.name;s.class=$("fClass").value;s.level=Number($("fLevel").value)||1;s.race=$("fRace").value;s.background=$("fBackground").value;s.ac=Number($("fAC").value)||10;s.speed=Number($("fSpeed").value)||9;
  s.stats={};$("stats").querySelectorAll("[data-stat]").forEach(i=>s.stats[i.dataset.stat]=Number(i.value)||10);s.proficiencies=[...$("skills").querySelectorAll("[data-skill]:checked")].map(i=>i.dataset.skill);s.saves=[...$("skills").querySelectorAll("[data-save]:checked")].map(i=>i.dataset.save);
+ s.weapons=[...$("weapons").querySelectorAll(".weapon-row")].map(r=>({name:r.querySelector('[data-w="name"]').value,bonus:Number(r.querySelector('[data-w="bonus"]').value)||0,damage:r.querySelector('[data-w="damage"]').value,type:r.querySelector('[data-w="type"]').value}));
+ const ar=$("armor").querySelector(".armor-row");
+ s.armor={name:ar.querySelector('[data-a="name"]').value,ac:Number(ar.querySelector('[data-a="ac"]').value)||0,equipped:ar.querySelector('[data-a="equipped"]').checked};
+ s.shield={name:ar.querySelector('[data-shield="name"]').value,bonus:Number(ar.querySelector('[data-shield="bonus"]').value)||0,equipped:!!ar.querySelector('[data-shield="name"]').value};
  s.inventory=[...$("inventory").querySelectorAll(".inventory")].map(r=>({name:r.querySelector('[data-k="name"]').value,qty:Number(r.querySelector('[data-k="qty"]').value)||1,type:r.querySelector('[data-k="type"]').value}));
  t.name=s.name;t.hp=Number($("fHP").value)||0;t.maxHp=Number($("fMaxHP").value)||1;t.sheet=s;send("update_sheet",{id:t.id,sheet:s,name:t.name,hp:t.hp,maxHp:t.maxHp});$("sheetModal").classList.remove("show");render()
 };
