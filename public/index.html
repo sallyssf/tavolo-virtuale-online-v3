@@ -12,7 +12,7 @@ button{background:#26323d;color:#eee;border:1px solid #465361;border-radius:6px;
 .stage{position:relative;overflow:hidden;background:#050505;cursor:grab}.stage.dragging{cursor:grabbing}
 #map{position:absolute;width:1650px;height:1100px;background:url('/map.png') center/100% 100%;transform-origin:0 0;touch-action:none}.token{touch-action:none}
 .grid{position:absolute;inset:0;background-image:linear-gradient(#ffffff35 1px,transparent 1px),linear-gradient(90deg,#ffffff35 1px,transparent 1px);background-size:50px 50px}
-.token{position:absolute;width:52px;height:52px;border:3px solid white;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:bold;color:white;cursor:grab;z-index:5;user-select:none;box-shadow:0 2px 8px #000}
+.token{position:absolute;width:52px;height:52px;border:3px solid white;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:bold;color:white;cursor:grab;z-index:5;user-select:none;box-shadow:0 2px 8px #000;font-size:18px}
 .token.hero{background:#2563eb}.token.enemy{background:#b91c1c}.token.npc{background:#a16207}.token.object{background:#475569}.token.selected{outline:4px solid #facc15}
 .side{background:#1b222a;padding:14px;overflow:auto;border-left:1px solid #39434d}.top{display:flex;justify-content:space-between;align-items:center;gap:8px}
 .status{font-weight:600}.connected{color:#86efac}.disconnected{color:#fca5a5}.card{background:#151b21;border:1px solid #39434d;border-radius:8px;padding:10px;margin:7px 0}.row{display:flex;justify-content:space-between;gap:8px}.hp{color:#86efac}.muted{color:#aab4bf;font-size:12px}
@@ -89,7 +89,6 @@ button{background:#26323d;color:#eee;border:1px solid #465361;border-radius:6px;
 <div class="form">
 <label>Nome<input id="fName"></label><label>Classe<input id="fClass"></label><label>Livello<input id="fLevel" type="number" min="1"></label>
 <label>Razza/specie<input id="fRace"></label><label>Background<input id="fBackground"></label><label>CA<input id="fAC" type="number"></label>
-<!-- QUI HO AGGIUNTO IL CAMPO INIZIATIVA -->
 <label>PF attuali<input id="fHP" type="number"></label><label>PF massimi<input id="fMaxHP" type="number"></label><label>Velocità<input id="fSpeed" type="number"></label><label>Iniziativa<input id="fInit" type="number"></label>
 </div>
 <h3>Caratteristiche</h3><div class="stats" id="stats"></div>
@@ -131,7 +130,10 @@ function render(){
    const e=document.createElement("div");
    e.className="token "+t.type+(selected===i?" selected":"");
    e.draggable=false;
-   e.textContent=t.type==="enemy"?"G":t.type==="hero"?"E":t.type==="npc"?"P":"?";
+   
+   // --- LA MODIFICA È QUI: Prende in automatico l'iniziale del nome (o "?" se manca) ---
+   e.textContent=t.name ? t.name.charAt(0).toUpperCase() : "?";
+   
    e.style.left=t.x+"px";
    e.style.top=t.y+"px";
    e.dataset.i=i;
@@ -216,7 +218,7 @@ $("addHero").onclick=()=>openName("add","hero");$("addEnemy").onclick=()=>openNa
 function openSheet(){
  if(selected===null)return;editingSheet=selected;const t=state.tokens[selected],s=t.sheet||defaultSheet(t.name);
  $("sheetTitle").textContent="Scheda: "+t.name;$("fName").value=s.name;$("fClass").value=s.class;$("fLevel").value=s.level;$("fRace").value=s.race;$("fBackground").value=s.background;$("fAC").value=s.ac;$("fHP").value=t.hp;$("fMaxHP").value=t.maxHp;$("fSpeed").value=s.speed;
- $("fInit").value=t.init; // <--- VALORE INIZIATIVA CARICATO QUI
+ $("fInit").value=t.init;
  $("stats").innerHTML=abilities.map(a=>`<div class="stat"><b>${a}</b><input data-stat="${a}" type="number" value="${s.stats[a]||10}"><div>Mod: <b>${modifier(s.stats[a]||10)>=0?"+":""}${modifier(s.stats[a]||10)}</b></div></div>`).join("");
  $("stats").querySelectorAll("input").forEach(inp=>inp.oninput=()=>inp.parentElement.querySelector("b").textContent=(modifier(inp.value)>=0?"+":"")+modifier(inp.value));
  $("skills").innerHTML=skillList.map(x=>`<label style="display:inline-block;margin:4px"><input type="checkbox" data-skill="${x}" ${s.proficiencies.includes(x)?"checked":""}> ${x}</label>`).join("")+"<br><b>Tiri salvezza:</b><br>"+abilities.map(x=>`<label style="display:inline-block;margin:4px"><input type="checkbox" data-save="${x}" ${s.saves.includes(x)?"checked":""}> ${x}</label>`).join("");
@@ -245,10 +247,10 @@ $("saveSheet").onclick=()=>{
  t.name=s.name;
  t.hp=Number($("fHP").value)||0;
  t.maxHp=Number($("fMaxHP").value)||1;
- t.init=Number($("fInit").value)||0; // <--- VALORE INIZIATIVA LETTO E SALVATO QUI
+ t.init=Number($("fInit").value)||0; 
  t.sheet=s;
  
- send("update_sheet",{id:t.id,sheet:s,name:t.name,hp:t.hp,maxHp:t.maxHp,init:t.init}); // <--- INVIATO AL SERVER QUI
+ send("update_sheet",{id:t.id,sheet:s,name:t.name,hp:t.hp,maxHp:t.maxHp,init:t.init}); 
  $("sheetModal").classList.remove("show");
  render();
 };
