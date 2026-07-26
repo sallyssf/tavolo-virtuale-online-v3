@@ -86,7 +86,7 @@ button{background:#26323d;color:#eee;border:1px solid #465361;border-radius:6px;
 </div>
 <h3>CHAT</h3><div class="chat" id="chat"></div><div class="chatbox"><input id="msg" placeholder="Scrivi..."><button id="send">➤</button></div>
 </aside>
-<div class="bottom"><button id="addHero">+ Eroe</button><button id="addEnemy">+ Mostro</button><button id="addNpc">+ PNG</button><button id="addObj">+ Oggetto</button><button id="toggleMove">🚶 Movimento</button><button id="toggleDM">👑 Modalità DM</button><span>V6: Iniziativa auto-calcolata</span><div class="zoom">Zoom <input id="zoom" type="range" min="50" max="160" value="85"><b id="zoomVal">85%</b></div></div>
+<div class="bottom"><button id="addHero">+ Eroe</button><button id="addEnemy">+ Mostro</button><button id="addNpc">+ PNG</button><button id="addObj">+ Oggetto</button><button id="toggleMove">🚶 Movimento</button><button id="toggleDM">👑 Modalità DM</button><span>V7: Iniziativa auto-sommata</span><div class="zoom">Zoom <input id="zoom" type="range" min="50" max="160" value="85"><b id="zoomVal">85%</b></div></div>
 </div>
 
 <div class="modal" id="sheetModal"><div class="modalbox">
@@ -97,6 +97,7 @@ button{background:#26323d;color:#eee;border:1px solid #465361;border-radius:6px;
 <label>PF attuali<input id="fHP" type="number"></label><label>PF massimi<input id="fMaxHP" type="number"></label><label>Velocità<input id="fSpeed" type="number"></label>
 <label>Mod. Iniziativa<input id="fInitMod" type="number" placeholder="es. +2"></label>
 <label>Lancio Iniziativa (D20)<input id="fInit" type="number" placeholder="Lancio D20"></label>
+<label>Totale Iniziativa (Auto)<input id="fInitTotal" type="text" disabled style="background:#111;color:#86efac;font-weight:bold"></label>
 <label>Bonus Competenza<input id="fProfBonus" type="number" placeholder="es. +2"></label>
 </div>
 <h3>Caratteristiche</h3><div class="stats" id="stats"></div>
@@ -114,7 +115,6 @@ button{background:#26323d;color:#eee;border:1px solid #465361;border-radius:6px;
 const abilities=["Forza","Destrezza","Costituzione","Intelligenza","Saggezza","Carisma"];
 const skillList=["Acrobazia","Addestrare Animali","Arcano","Atletica","Furtività","Indagare","Inganno","Intimidire","Intuizione","Medicina","Natura","Percezione","Persuasione","Rapidità di Mano","Religione","Sopravvivenza","Storia","Intrattenere"];
 
-// Aggiunto baseInit per non sovrascrivere il d20 puro
 function defaultSheet(name,cls){return{name,class:cls||"Guerriero",level:1,race:"",background:"",ac:10,speed:9,movementUsed:0,initMod:0,baseInit:0,profBonus:2,stats:{Forza:10,Destrezza:10,Costituzione:10,Intelligenza:10,Saggezza:10,Carisma:10},proficiencies:[],saves:[],inventory:[],weapons:[],armor:{name:"",ac:0,equipped:false},shield:{name:"",bonus:0,equipped:false},conditions:[]}}
 function modifier(v){return Math.floor((Number(v)-10)/2)}
 
@@ -232,14 +232,22 @@ $("renameBtn").onclick=()=>selected!==null&&openName("rename");
 $("deleteBtn").onclick=()=>{if(selected!==null&&confirm("Eliminare questa pedina?")){send("delete_token",{id:state.tokens[selected].id});selected=null;$("selected").textContent="Nessuna pedina selezionata"}};
 $("addHero").onclick=()=>openName("add","hero");$("addEnemy").onclick=()=>openName("add","enemy");$("addNpc").onclick=()=>openName("add","npc");$("addObj").onclick=()=>openName("add","object");
 
+function updateInitPreview(){
+  const mod = Number($("fInitMod").value) || 0;
+  const base = Number($("fInit").value) || 0;
+  $("fInitTotal").value = base + mod;
+}
+
 function openSheet(){
  if(selected===null)return;editingSheet=selected;const t=state.tokens[selected],s=t.sheet||defaultSheet(t.name);
  $("sheetTitle").textContent="Scheda: "+t.name;$("fName").value=s.name;$("fClass").value=s.class;$("fLevel").value=s.level;$("fRace").value=s.race;$("fBackground").value=s.background;$("fAC").value=s.ac;$("fHP").value=t.hp;$("fMaxHP").value=t.maxHp;$("fSpeed").value=s.speed;
  
- // Carica il modificatore e il lancio puro, per non sovrascriverli
- $("fInitMod").value=s.initMod||0;
- $("fInit").value=s.baseInit!==undefined?s.baseInit:(t.init||0);
- 
+ $("fInitMod").value = s.initMod || 0;
+ // Gestione corretta della base per evitare sovrascritture errate con il totale
+ let baseI = s.baseInit !== undefined ? s.baseInit : ((t.init || 0) - (s.initMod || 0));
+ $("fInit").value = baseI;
+ updateInitPreview();
+
  $("fProfBonus").value=s.profBonus||2;
  
  $("stats").innerHTML=abilities.map(a=>{
@@ -276,6 +284,10 @@ function openSheet(){
  $("conditions").innerHTML=(s.conditions||[]).map(c=>`<span class="condition">${c}</span>`).join("");
  $("sheetModal").classList.add("show");
 }
+
+$("fInitMod").oninput = updateInitPreview;
+$("fInit").oninput = updateInitPreview;
+
 $("openSheet").onclick=openSheet;$("closeSheet").onclick=()=>$("sheetModal").classList.remove("show");
 
 $("addWeapon").onclick=()=>{if(editingSheet!==null){state.tokens[editingSheet].sheet.weapons.push({name:"",txc:0,dmgDice:"",dmgMod:0,type:""});openSheet()}};
@@ -292,7 +304,6 @@ $("saveSheet").onclick=()=>{
  
  s.proficiencies=[...$("skills").querySelectorAll("[data-skill]:checked")].map(i=>i.dataset.skill);s.saves=[...$("skills").querySelectorAll("[data-save]:checked")].map(i=>i.dataset.save);
  
- // Salvataggio dei singoli valori e calcolo finale per la colonna Iniziativa
  s.initMod=Number($("fInitMod").value)||0;
  s.baseInit=Number($("fInit").value)||0;
  s.profBonus=Number($("fProfBonus").value)||2;
@@ -314,8 +325,8 @@ $("saveSheet").onclick=()=>{
  t.hp=Number($("fHP").value)||0;
  t.maxHp=Number($("fMaxHP").value)||1;
  
- // Il vero valore dell'iniziativa per il turno è Lancio + Modificatore
- t.init=s.baseInit + s.initMod; 
+ // Somma automatica sicura
+ t.init = s.baseInit + s.initMod; 
  t.sheet=s;
  
  send("update_sheet",{id:t.id,sheet:s,name:t.name,hp:t.hp,maxHp:t.maxHp,init:t.init}); 
