@@ -115,8 +115,56 @@ button{background:#26323d;color:#eee;border:1px solid #465361;border-radius:6px;
 const abilities=["Forza","Destrezza","Costituzione","Intelligenza","Saggezza","Carisma"];
 const skillList=["Acrobazia","Addestrare Animali","Arcano","Atletica","Furtività","Indagare","Inganno","Intimidire","Intuizione","Medicina","Natura","Percezione","Persuasione","Rapidità di Mano","Religione","Sopravvivenza","Storia","Intrattenere"];
 
+const skillAbilityMap = {
+  "Acrobazia": "Destrezza",
+  "Addestrare Animali": "Saggezza",
+  "Arcano": "Intelligenza",
+  "Atletica": "Forza",
+  "Furtività": "Destrezza",
+  "Indagare": "Intelligenza",
+  "Inganno": "Carisma",
+  "Intimidire": "Carisma",
+  "Intuizione": "Saggezza",
+  "Medicina": "Saggezza",
+  "Natura": "Intelligenza",
+  "Percezione": "Saggezza",
+  "Persuasione": "Carisma",
+  "Rapidità di Mano": "Destrezza",
+  "Religione": "Intelligenza",
+  "Sopravvivenza": "Saggezza",
+  "Storia": "Intelligenza",
+  "Intrattenere": "Carisma"
+};
+
 function defaultSheet(name,cls){return{name,class:cls||"Guerriero",level:1,race:"",background:"",ac:10,speed:9,movementUsed:0,initMod:0,baseInit:0,profBonus:2,stats:{Forza:10,Destrezza:10,Costituzione:10,Intelligenza:10,Saggezza:10,Carisma:10},proficiencies:[],saves:[],inventory:[],weapons:[],armor:{name:"",ac:0,equipped:false},shield:{name:"",bonus:0,equipped:false},conditions:[]}}
 function modifier(v){return Math.floor((Number(v)-10)/2)}
+
+function updateSkillsAndSavesDisplay() {
+  const prof = Number($("fProfBonus").value) || 0;
+  
+  const mods = {};
+  abilities.forEach(a => {
+    const inp = document.querySelector(`input[data-mod="${a}"]`);
+    mods[a] = inp ? (Number(inp.value) || 0) : 0;
+  });
+
+  document.querySelectorAll("[data-skill-container]").forEach(el => {
+    const skill = el.dataset.skillContainer;
+    const ability = skillAbilityMap[skill];
+    const isProf = el.querySelector("input[type='checkbox']").checked;
+    const total = (mods[ability] || 0) + (isProf ? prof : 0);
+    const badge = el.querySelector(".mod-badge");
+    if (badge) badge.textContent = (total >= 0 ? "+" : "") + total;
+  });
+
+  document.querySelectorAll("[data-save-container]").forEach(el => {
+    const ability = el.dataset.saveContainer;
+    const isProf = el.querySelector("input[type='checkbox']").checked;
+    const total = (mods[ability] || 0) + (isProf ? prof : 0);
+    const badge = el.querySelector(".mod-badge");
+    if (badge) badge.textContent = (total >= 0 ? "+" : "") + total;
+  });
+}
 
 let state={tokens:[
 {id:"a1",name:"Arannis",type:"hero",hp:19,maxHp:19,init:18,x:360,y:470,sheet:defaultSheet("Arannis")},
@@ -243,7 +291,6 @@ function openSheet(){
  $("sheetTitle").textContent="Scheda: "+t.name;$("fName").value=s.name;$("fClass").value=s.class;$("fLevel").value=s.level;$("fRace").value=s.race;$("fBackground").value=s.background;$("fAC").value=s.ac;$("fHP").value=t.hp;$("fMaxHP").value=t.maxHp;$("fSpeed").value=s.speed;
  
  $("fInitMod").value = s.initMod || 0;
- // Gestione corretta della base per evitare sovrascritture errate con il totale
  let baseI = s.baseInit !== undefined ? s.baseInit : ((t.init || 0) - (s.initMod || 0));
  $("fInit").value = baseI;
  updateInitPreview();
@@ -258,12 +305,53 @@ function openSheet(){
      Mod: <input data-mod="${a}" type="number" value="${m}" style="width:55px;padding:4px">
    </div></div>`;
  }).join("");
- $("stats").querySelectorAll("input[data-stat]").forEach(inp=>inp.oninput=()=>{
-   inp.parentElement.querySelector("input[data-mod]").value=modifier(inp.value);
+
+ const saveHtml = abilities.map(x => {
+   const isProf = s.saves.includes(x);
+   return `<label data-save-container="${x}" style="display:inline-flex;align-items:center;justify-content:space-between;background:#151b21;padding:5px 8px;border-radius:6px;border:1px solid #39434d">
+     <span style="display:flex;align-items:center;gap:6px">
+       <input type="checkbox" data-save="${x}" ${isProf ? "checked" : ""}>
+       <b>${x}</b>
+     </span>
+     <span class="mod-badge" style="background:#26323d;padding:2px 6px;border-radius:4px;font-weight:bold;color:#86efac">+0</span>
+   </label>`;
+ }).join("");
+
+ const skillHtml = skillList.map(x => {
+   const ability = skillAbilityMap[x] || "Forza";
+   const isProf = s.proficiencies.includes(x);
+   return `<label data-skill-container="${x}" style="display:inline-flex;align-items:center;justify-content:space-between;background:#151b21;padding:5px 8px;border-radius:6px;border:1px solid #39434d">
+     <span style="display:flex;align-items:center;gap:6px">
+       <input type="checkbox" data-skill="${x}" ${isProf ? "checked" : ""}>
+       <span>${x} <small class="muted">(${ability.slice(0,3).toUpperCase()})</small></span>
+     </span>
+     <span class="mod-badge" style="background:#26323d;padding:2px 6px;border-radius:4px;font-weight:bold;color:#86efac">+0</span>
+   </label>`;
+ }).join("");
+
+ $("skills").innerHTML = `
+   <b style="display:block;margin-bottom:6px">🛡️ Tiri Salvezza</b>
+   <div style="display:grid;grid-template-columns:repeat(auto-fill, minmax(130px, 1fr));gap:6px;margin-bottom:14px">${saveHtml}</div>
+   <b style="display:block;margin-bottom:6px">🎯 Abilità</b>
+   <div style="display:grid;grid-template-columns:repeat(auto-fill, minmax(200px, 1fr));gap:6px">${skillHtml}</div>
+ `;
+
+ $("stats").querySelectorAll("input").forEach(inp => {
+   inp.addEventListener("input", () => {
+     if (inp.dataset.stat) {
+       inp.parentElement.querySelector("input[data-mod]").value = modifier(inp.value);
+     }
+     updateSkillsAndSavesDisplay();
+   });
  });
 
- $("skills").innerHTML=skillList.map(x=>`<label style="display:inline-block;margin:4px"><input type="checkbox" data-skill="${x}" ${s.proficiencies.includes(x)?"checked":""}> ${x}</label>`).join("")+"<br><b>Tiri salvezza:</b><br>"+abilities.map(x=>`<label style="display:inline-block;margin:4px"><input type="checkbox" data-save="${x}" ${s.saves.includes(x)?"checked":""}> ${x}</label>`).join("");
- 
+ $("fProfBonus").oninput = updateSkillsAndSavesDisplay;
+ $("skills").querySelectorAll("input[type='checkbox']").forEach(cb => {
+   cb.onchange = updateSkillsAndSavesDisplay;
+ });
+
+ updateSkillsAndSavesDisplay();
+
  $("weapons").innerHTML=(s.weapons||[]).map(w=>{
    const txc = w.txc !== undefined ? w.txc : (w.bonus || 0);
    const dDice = w.dmgDice || w.damage || "";
@@ -325,7 +413,6 @@ $("saveSheet").onclick=()=>{
  t.hp=Number($("fHP").value)||0;
  t.maxHp=Number($("fMaxHP").value)||1;
  
- // Somma automatica sicura
  t.init = s.baseInit + s.initMod; 
  t.sheet=s;
  
